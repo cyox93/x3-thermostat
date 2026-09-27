@@ -1,0 +1,62 @@
+#pragma once
+
+#include <stdbool.h>
+#include "esp_err.h"
+#include "x3switch.h"
+
+#define SC_MODEL    "X3THERMOSTAT"
+#define SC_VERSION  "0.1.0"
+
+esp_err_t sc_mainloop_init(void);
+
+/*
+ * switchloop — owner of the x3-switch board: relays, button LEDs and keys.
+ *
+ * The setters only record the wanted state and return; switchloop sends the
+ * AT commands from its own thread, and pushes everything again when the
+ * board reports it has rebooted. Callers never wait on the UART.
+ */
+typedef enum {
+    SC_SWITCH_KEY_CLICK,        /* released before the long-press time */
+    SC_SWITCH_KEY_LONG,         /* held for the long-press time (fires while held) */
+} sc_switch_key_t;
+
+/* Runs in the switchloop thread. ch = 1..4 (K1..K4). */
+typedef void (*sc_switch_key_callback_t)(int ch, sc_switch_key_t event, void *arg);
+
+esp_err_t sc_switchloop_init(void);
+void sc_switchloop_end(void);
+esp_err_t sc_switchloop_register_key_callback(sc_switch_key_callback_t callback, void *arg);
+bool sc_switch_is_ready(void);
+
+esp_err_t sc_switch_relay_set(int ch, bool on);
+esp_err_t sc_switch_led_set(int ch, sc_x3switch_led_t mode);
+esp_err_t sc_switch_led_interval(int ch, uint16_t ms);
+esp_err_t sc_switch_led_enable(bool on);
+esp_err_t sc_switch_led_brightness(uint8_t percent);
+
+/*
+ * sysloop — owner of the unit's policy state. Keys (via switchloop), the
+ * encoder and periodic sensor timers all land on its eventloop, so every
+ * decision happens in one thread.
+ */
+typedef struct sc_sysinfo {
+    float temp;             /* °C, valid when climate_valid */
+    float humid;            /* %RH */
+    bool climate_valid;
+
+    float ambient_lux;      /* approximate (datasheet typical sensitivity) */
+    int bright_level;       /* sc_bright_level_t */
+    bool screen_on;
+} sc_sysinfo_t;
+
+/* Display / button LED brightness, chosen from ambient light */
+typedef enum {
+    SC_BRIGHT_NIGHT,        /* lights off, sleeping — screen off unless touched */
+    SC_BRIGHT_DIM,          /* lamp / indirect light */
+    SC_BRIGHT_NORMAL,       /* room lights on */
+} sc_bright_level_t;
+
+esp_err_t sc_sysloop_init(void);
+void sc_sysloop_end(void);
+const sc_sysinfo_t *sc_sysloop_get_info(void);
