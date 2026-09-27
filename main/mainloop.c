@@ -25,6 +25,7 @@ esp_err_t sc_mainloop_init(void)
 
     ESP_ERROR_CHECK(sc_switchloop_init());
     ESP_ERROR_CHECK(sc_sysloop_init());
+    ESP_ERROR_CHECK(sc_plcloop_init());
 
     return ESP_OK;
 }

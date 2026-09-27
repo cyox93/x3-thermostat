@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include "esp_err.h"
 #include "x3switch.h"
+#include "plc.h"
 
 #define SC_MODEL    "X3THERMOSTAT"
 #define SC_VERSION  "0.1.0"
@@ -60,3 +61,13 @@ typedef enum {
 esp_err_t sc_sysloop_init(void);
 void sc_sysloop_end(void);
 const sc_sysinfo_t *sc_sysloop_get_info(void);
+
+/*
+ * plcloop — owner of the PLC bus link to the boiler controller. Frames are
+ * gathered into groups (frames 12 ms apart, groups 254 ms apart); what the
+ * groups mean is not decoded yet (docs/plc-protocol.md).
+ */
+esp_err_t sc_plcloop_init(void);
+void sc_plcloop_end(void);
+/* Queues one frame per byte (≤ SC_PLC_SEND_MAX); the plcloop thread sends them */
+esp_err_t sc_plcloop_send(const uint8_t *data, size_t len);

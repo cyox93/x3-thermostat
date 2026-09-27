@@ -65,6 +65,13 @@
  * saturates around ~190 lux, which only ever means "room lights are on". */
 #define BOARD_ALS_LOAD_OHM      100000
 
+/* --- Header J3 — UART0 ----------------------------------------------- */
+
+/* Free for debug output (the console is on USB Serial/JTAG). The ROM still
+ * prints its boot banner here on reset. */
+#define BOARD_UART0_TX_PIN      43
+#define BOARD_UART0_RX_PIN      44
+
 /* --- On-board --------------------------------------------------------- */
 
 #define BOARD_RGB_LED_PIN       21      /* WS2812B-0807 */

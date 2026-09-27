@@ -14,6 +14,10 @@
 | x3-switch 드라이버 + switchloop (AT 클라이언트, 상태 동기화, CLICK/LONG) | ✅ 빌드 확인, **실기 미확인** |
 | loop 구조 (`main/` mainloop · switchloop · sysloop, eventloop 기반) | ✅ 빌드 확인 |
 | 밝기 3단계 (NORMAL / DIM / NIGHT) — 임시 사양 | ✅ 빌드 확인 |
+| PLC 파형 규칙 실측 (MC200 송신: 셀 1017 µs, 온타임 PWM, 프레임 = 8비트) | ✅ `docs/plc-protocol.md` |
+| PLC 드라이버 (RMT RX/TX) + plcloop | ✅ 실기 수신 · echo 확인 |
+| PLC 메시지 해독 — 종류 · 방향 · 주소 · 상태 비트 · 항목 · 모드 · 등록 / 알림 / 원격 설정 순서 (LT200SPD · DT-200 실측) | ✅ `docs/plc-protocol.md` §5 — 일부 항목 미상 |
+| PLC 수신 개선 (idle 5 ms, 1024 심볼 버퍼, 그룹 100 ms) | ✅ 실기 메시지 오류 0 |
 | main-board rev A · x3_uart_board rev A | 2026-09-15 발주, 수령 대기 |
 | x3-switch 펌웨어 AT 규격 0.1.0 | ✅ 구현 · 실측 (K4 리셋 문제 제외) |
 
@@ -70,12 +74,18 @@
 
 ## Phase D — PLC (프로젝트 임계 경로)
 
-- [ ] **수신 캡처**: `DOUT_BUF`(IO40) 엣지 타임스탬프를 RMT RX 또는 GPIO ISR로 수집 → 콘솔/USB로 덤프
-- [ ] 원본 DT-200을 병렬로 둔 채 조작별 패턴 기록 → 비트레이트 · 패킷 · 체크섬 · **방 주소** 해독
-- [ ] 해독 결과를 `docs/plc-protocol.md`로 정리
-- [ ] 드라이버 `components/plc/` + `main/plcloop.c`
-- [ ] **송신**: `/SCTL`(IO39) 오픈드레인으로 패킷 송신, MC200 밸브 동작 확인
-- [ ] 원본 DT-200 제거 후 단독 제어
+- [x] 파형 규칙 실측 — 셀 · 심볼 · 프레임 · 그룹 (`docs/plc-protocol.md`)
+- [x] 드라이버 `components/plc/` (RMT RX 해독 · RMT TX 오픈드레인) + `main/plcloop.c` (그룹 조립, `plc` · `plc_mon` · `plc_send`)
+- [x] **실기 수신**: MC200 폴링이 체크섬 오류 없이 잡힘
+- [x] 메시지 틀 · 비트 순서 · 폴링 방 번호 해독
+- [x] 자기 송신 echo 확인 (`plc_send` → 자기 수신기에서 그대로 해독)
+- [x] LT200SPD(방 2 · 방 3) · DT-200을 물리고 조작별 기록 → 메시지 해독 (`docs/plc-protocol.md` §5)
+- [ ] 남은 미상 항목 (`plc-protocol.md` §8) — OFF 모드, `CA`의 미상 값, MC200 항목 등
+- [ ] 재부팅 · 플래시 뒤 등록이 풀리는 원인 확인 (재부팅 중 IO39 스코프)
+- [ ] **방 조절기 역할**: 빈 주소(예: 주소 6)로 등록 → 폴링 응답 · 알림 · 원격 설정, MC200이 받아 주는지 확인
+- [ ] 난방 요구 송신 → 보일러 가동 비트 · 밸브 동작 확인
+- [ ] 원본 LT200SPD 제거 후 단독 제어 (DT-200과 공존)
+- [ ] **거실 조절기 역할**: 주소 1, 방 상태 표(엿듣기), `F5` 원격 설정, 온수 설정 → DT-200 제거
 
 > 해독하지 못하면 온도 제어가 불가능하고 전등 스위치만 남는다.
 
@@ -96,7 +106,7 @@
 
 | # | 항목 | 영향 |
 |---|---|---|
-| 1 | PLC 프로토콜 | Phase D 전체 |
+| 1 | PLC 프로토콜 — 메시지는 해독, 일부 항목 미상 · MC200이 우리 송신을 받는지 미시험 (`docs/plc-protocol.md` §8) | Phase D |
 | 2 | 큰방 버튼 배정 (전등 3개, K3 · K4 외 한 개) | sysloop 방 설정 |
 | 3 | K4 → x3-switch 리셋 (하드웨어 수리 필요) | K4를 정책에서 제외 중 |
 | 4 | AHT25 배치 (발열) | 온도 보정 필요 여부 |

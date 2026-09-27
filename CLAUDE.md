@@ -22,6 +22,7 @@ Read `docs/` before changing behaviour:
 | `docs/architecture.md` | Role split, component layout, event flow, x3-switch link rules |
 | `docs/hardware.md` | Pin map, N16R8 constraints, electrical behaviour |
 | `docs/roadmap.md` | Phases and status |
+| `docs/plc-protocol.md` | Boiler-bus PLC: waveform, messages, items, sequences, RMT implementation, what X3 must do |
 
 System-level design (power distribution, PLC, board fabrication, X3 modifications) is
 kept outside this repository. `docs/` carries everything the firmware needs — keep it
@@ -53,10 +54,12 @@ with evidence from the bench, not with reasoning alone.
   `encoder` (PCNT, ISR callback), `als` (ambient light, ADC1), `temp_humid` (AHT25, I2C —
   `measure_trigger` then `get`, chip hidden behind the API), `gpio_cmd` (debug). `device.c::sc_device_init()` brings them up.
 - **`components/x3switch/`** — AT client for the x3-switch board; notifications via callback.
+- **`components/plc/`** — PLC modem link on RMT: RX decodes one frame = one byte in the ISR,
+  TX sends open-drain on `/SCTL`. Waveform rules and what is still unknown: `docs/plc-protocol.md`.
 - **`main/`** — the application as *loops*, same layout as the user's `scmbd` project:
   `main.c` (init order), `main.h` (public loop APIs), `mainloop.c` (inits loops),
   `switchloop.c` (owns relays / button LEDs / keys), `sysloop.c` (owns policy, sensors,
-  display brightness levels).
+  display brightness levels), `plcloop.c` (gathers PLC frames into groups, sends).
 
 **Event-driven rule**: drivers never know about eventloops — they expose callbacks.
 Each `xxxloop.c` owns one `sc_eventloop`, a private `_xxxloop_t` state and its

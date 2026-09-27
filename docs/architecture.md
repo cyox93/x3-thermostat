@@ -11,10 +11,17 @@ main-board(ESP32-S3)가 **벽면 유닛 한 대의 두뇌**가 된다. 한 대�
 | 기능 | 경로 | 연동 대상 |
 |---|---|---|
 | **전등 스위치** | x3-switch 릴레이 (AT) · WiFi → **MQTT** | homebridge-mqttthing |
-| **각 방 온도조절기** (DT-200 대체) | AHT25 측정 → **PLC 2선** (500 kHz ASK) | MC200 밸브제어기 |
+| **온도조절기** | AHT25 측정 → **PLC 2선** (500 kHz ASK) | MC200 밸브제어기 |
 
-설치 대상은 방 3개다 (큰방 · 놀이방 · 일하는방). 펌웨어는 세 대가 같고, 방마다 다른 점
-(전등 수, 버튼 배정, PLC 방 주소)은 **설정(NVS)** 으로 흡수한다 → [§5](#5-방별-차이는-설정으로).
+기존 보일러 버스의 조절기 **두 종류를 모두 대체**한다 ([plc-protocol.md](plc-protocol.md) §7).
+
+| 역할 | 대체 대상 | PLC 주소 | 하는 일 |
+|---|---|---|---|
+| 방 조절기 | 각방 LT200SPD | 방 번호 + 1 | 자기 방 온도 · 모드, 원격 설정(DT-200 · 월패드) 반영 |
+| 거실 조절기 | 거실 DT-200 | 1 | 위에 더해 모든 방 상태 보기 · 설정, 온수 온도 설정 |
+
+설치 대상은 방 3개(큰방 · 놀이방 · 일하는방)와 거실이다. 펌웨어는 모두 같고, 유닛마다 다른 점
+(역할, 전등 수, 버튼 배정, PLC 주소)은 **설정(NVS)** 으로 흡수한다 → [§5](#5-방별-차이는-설정으로).
 
 > **WiFi가 끊겨도 노브와 버튼으로 난방 · 전등을 로컬 조작할 수 있어야 한다.**
 > 전등(MQTT)과 보일러(PLC)는 서로 독립된 경로이고, 로컬 제어는 둘 다에 의존하지 않는다.
@@ -69,19 +76,19 @@ flowchart LR
 
 ```
 main/
-  main.c · main.h       app_main — config · console · device · x3switch 초기화 → mainloop
+  main.c · main.h       app_main — config · console · device · x3switch · plc 초기화 → mainloop
   mainloop.c            ✅ get_ver, 각 loop 초기화
   switchloop.c          ✅ x3-switch 보드의 소유자 — 릴레이 · 버튼 LED 상태 동기화, 키 CLICK/LONG 판정
   sysloop.c             🔶 정책의 소유자 — 키 · 엔코더 · AHT25 · 조도 (정책은 TODO)
   uiloop.c              ⬜ 화면 (LVGL 예정)
-  plcloop.c             ⬜ PLC 수신 해독 · 난방 요구 송신
+  plcloop.c             🔶 PLC 프레임 → 그룹 · 메시지(체크섬), 송신 요청 (조절기 역할은 TODO)
   netloop.c             ⬜ WiFi · MQTT
 components/
   include/board.h       main-board 핀맵 (유일한 원본, docs/hardware.md와 쌍)
   core/                 ✅ eventloop · console · config(NVS)
   device/               ✅ gc9a01(LCD) · led(Ring+BL) · encoder · als(조도) · temp_humid(온습도, AHT25) · gpio_cmd
   x3switch/             ✅ x3-switch AT 클라이언트 (UART)
-  plc/                  ⬜ PLC 모뎀 드라이버 (캡처 · 오픈드레인 송신)
+  plc/                  ✅ PLC 모뎀 드라이버 — RMT RX 해독 · RMT TX 오픈드레인 송신 (프레임 = 1바이트)
 ```
 
 ✅ = 코드 있음, 🔶 = 골격, ⬜ = 예정. 계획과 순서는 [roadmap.md](roadmap.md).
@@ -104,6 +111,7 @@ loop 파일의 형식은 `scmbd` 프로젝트와 같다 — `_xxxloop_t` 상태 
 x3switch "+KEY" (UART 태스크) ──post──▶ switchloop: DOWN/UP → CLICK/LONG ──콜백──post──▶ sysloop
 x3switch "+READY" ────────────post──▶ switchloop: 원하는 상태 전부 재전송
 encoder (ISR) ──────post_from_isr──▶ sysloop (밤이면 화면 깨우기)
+plc RMT RX (ISR) ──post_from_isr──▶ plcloop: 프레임 → 100 ms 조용하면 그룹 확정 → 메시지 (docs/plc-protocol.md §6)
                         타이머 1 s ──▶ sysloop: 조도 측정 → 밝기 단계 (§3.5)
                         타이머 10 s ─▶ sysloop: AHT25 측정 시작 → 80 ms 타이머 → 읽기
 
@@ -197,7 +205,7 @@ switchloop에 있다. 드라이버를 직접 부르는 명령을 두면 loop가 
   └─ ESP32: config(NVS) → console → device(LCD · Ring · 엔코더 · 센서) → x3switch
             → mainloop → switchloop (AT+STATUS? 로 보드 상태 채택)
                        → sysloop (센서 타이머 · 키 · 엔코더)
-            → (예정) 방 설정 로드 · plcloop · netloop (WiFi 실패해도 로컬 동작 계속)
+            → plcloop → (예정) 방 설정 로드 · netloop (WiFi 실패해도 로컬 동작 계속)
 ```
 
 난방 설정(목표 온도, ON/OFF)은 NVS에 두어 정전 뒤에도 복원한다. 전등 상태는
@@ -209,7 +217,7 @@ switchloop에 있다. 드라이버를 직접 부르는 명령을 두면 loop가 
 |---|---|---|
 | 전등 | 3 (L1~L3) | 2 (L1 · L2) |
 | 버튼 배정 | 미결 — K1 또는 K2를 세 번째 등에 | K3 · K4 = 전등 1 · 2 |
-| PLC 방 주소 | Phase 1 해독 후 결정 | 〃 |
+| 역할 · PLC 주소 | 방 조절기, 주소 = DT-200의 방 번호 + 1 (방별 번호는 설치 때 확인) | 〃 (거실 유닛은 거실 조절기, 주소 1) |
 | MQTT 토픽 접두사 | 방 이름 | 방 이름 |
 
 **펌웨어 바이너리는 한 개다.** 방 설정은 NVS(`core/config`)에 두고 콘솔로 기록한다 — 명령은 아직 없다 (Phase C).
@@ -220,4 +228,5 @@ switchloop에 있다. 드라이버를 직접 부르는 명령을 두면 loop가 
 |---|---|
 | [hardware.md](hardware.md) | 핀맵 · 모듈 제약 · 패널 신호의 전기적 동작 |
 | [roadmap.md](roadmap.md) | 단계별 작업과 미결 사항 |
+| [plc-protocol.md](plc-protocol.md) | 보일러 버스 PLC 파형 규칙 · 프레임 포맷 · 구현 |
 | `x3-switch/docs/at-protocol.md` | x3-switch AT 명령 규격 (원본) |

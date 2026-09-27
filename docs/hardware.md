@@ -61,8 +61,8 @@
 | 40 | PLC `DOUT_BUF` | ← | J2-8 | | `BOARD_PLC_DOUT_PIN` | HIGH = 캐리어 |
 | 41 | I2C SDA (AHT25) | ↔ | J2-9 | | `BOARD_I2C_SDA_PIN` | 풀업 R14 4.7 kΩ |
 | 42 | I2C SCL (AHT25) | → | J2-10 | | `BOARD_I2C_SCL_PIN` | 풀업 R15 4.7 kΩ |
-| 43 | UART0 TX | → | J3-1 | | | 기본 미사용 |
-| 44 | UART0 RX | ← | J3-2 | | | 기본 미사용 |
+| 43 | UART0 TX | → | J3-1 | | `BOARD_UART0_TX_PIN` | 임시: PLC 그룹 덤프 115200 (plcloop) |
+| 44 | UART0 RX | ← | J3-2 | | `BOARD_UART0_RX_PIN` | 미사용 |
 | 45 · 46 | — | | | | | 스트래핑, 연결 안 함 |
 | 47 | LED Ring 색 | → | J2-4 | 4 | `BOARD_RING_COLOR_PIN` | LOW = red, HIGH = white |
 | 48 | 엔코더 B | ← | J2-5 | 3 | `BOARD_ENC_B_PIN` | PCNT, R10 1 kΩ |
@@ -137,6 +137,7 @@ main-board의 33 Ω가 그 역할을 대신한다.
   → `GPIO_MODE_OUTPUT_OD`로만 설정하고 **LOW만 구동, HIGH는 개방**한다. LOW = 송신.
 - `DOUT_BUF`(IO40): 모듈 R23 = 20 kΩ로 3.3 V 레벨. **HIGH = 캐리어 검출**.
 - J4-1(+5V)은 연결하지 않는다.
+- 두 핀 모두 RMT가 쓴다 — `DOUT_BUF` = RX, `/SCTL` = TX(출력 반전 + 오픈드레인). 파형 규칙은 [plc-protocol.md](plc-protocol.md).
 
 ### 3.4 엔코더
 

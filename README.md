@@ -1,7 +1,7 @@
 # x3-thermostat — ESP32-S3 main-board firmware
 
 X3 Thermostat의 **main-board rev A (ESP32-S3-WROOM-1-N16R8)** 펌웨어.
-Tuya X3 노브 스위치를 **각 방 온도조절기(DT-200 대체) 겸 전등 스위치**로 바꾸는 프로젝트에서
+Tuya X3 노브 스위치를 **온도조절기(거실 DT-200 · 각방 LT200SPD 대체) 겸 전등 스위치**로 바꾸는 프로젝트에서
 두뇌 역할을 한다 — LCD · 엔코더 · LED Ring 구동, AHT25 측정, 조도에 따른 화면 · LED 밝기 조절, PLC로 보일러(MC200) 제어,
 WiFi/MQTT로 전등 연동, 그리고 X3 안의 x3-switch 보드(별도 저장소 `x3-switch`)에 AT 명령으로 버튼 · LED · 릴레이를 맡긴다.
 
@@ -53,6 +53,9 @@ defaults로 옮긴다).
 | `btn_led_en <on\|off>` · `btn_led_bri <0-100>` | 버튼 LED 전체 on/off · 밝기 (switchloop) |
 | `x3switch [reset]` | x3-switch 버전 · 보드가 보고하는 전체 상태 / 소프트 리셋 |
 | `bright [auto\|night\|dim\|normal]` | 밝기 단계 조회 / 강제 (센서 없는 책상에서는 `normal`) |
+| `plc` | PLC 마지막 그룹 · 수신 / 오류 / 송신 카운트 (plcloop) |
+| `plc_mon <on\|off>` | PLC 프레임마다 출력 |
+| `plc_send <hex>...` | 바이트마다 PLC 프레임 송신, 예 `plc_send 83 01 04` (plcloop). 실제 버스에 나간다 |
 | `sysinfo` | sysloop이 가진 온습도 · 조도 · x3-switch 상태 |
 | `get_ver` | 펌웨어 버전 |
 | `help` | 전체 목록 (시스템 명령 포함) |
