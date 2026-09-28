@@ -81,7 +81,7 @@ main/
   switchloop.c          ✅ x3-switch 보드의 소유자 — 릴레이 · 버튼 LED 상태 동기화, 키 CLICK/LONG 판정
   sysloop.c             🔶 정책의 소유자 — 키 · 엔코더 · AHT25 · 조도 (정책은 TODO)
   uiloop.c              ⬜ 화면 (LVGL 예정)
-  plcloop.c             🔶 PLC 프레임 → 그룹 · 메시지(체크섬), 송신 요청 (조절기 역할은 TODO)
+  plcloop.c             🔶 PLC 프레임 → 그룹 · 메시지(체크섬), 송신 요청, 벤치 빌드 전용 MC200 대역(송신 검증) (조절기 역할은 TODO)
   netloop.c             ⬜ WiFi · MQTT
 components/
   include/board.h       main-board 핀맵 (유일한 원본, docs/hardware.md와 쌍)

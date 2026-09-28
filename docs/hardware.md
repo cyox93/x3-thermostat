@@ -138,6 +138,8 @@ main-board의 33 Ω가 그 역할을 대신한다.
 - `DOUT_BUF`(IO40): 모듈 R23 = 20 kΩ로 3.3 V 레벨. **HIGH = 캐리어 검출**.
 - J4-1(+5V)은 연결하지 않는다.
 - 두 핀 모두 RMT가 쓴다 — `DOUT_BUF` = RX, `/SCTL` = TX(출력 반전 + 오픈드레인). 파형 규칙은 [plc-protocol.md](plc-protocol.md).
+- **MC200 없는 벤치 버스**: 12 V 전원을 바로 물리면 캐리어가 0.3 Vpp로 눌려 통신이 안 된다.
+  +12 V에 **470 µH 직렬**로 동작 확인 (2026-09-28) → [plc-protocol.md §6.3](plc-protocol.md#63-벤치-버스--mc200-없이).
 
 ### 3.4 엔코더
 

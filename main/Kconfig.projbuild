@@ -1,0 +1,13 @@
+menu "X3 Thermostat"
+
+    config SC_PLC_MC200_STANDIN
+        bool "PLC: bench MC200 stand-in (plc_mc200)"
+        default n
+        help
+            Bench only. Builds the plc_mc200 console command, which polls one
+            DT-200 or LT200SPD and answers it the way the MC200 does, so PLC
+            TX can be tested on a bus with no MC200. Never enable it in the
+            firmware that goes on the real boiler bus: two pollers would
+            collide. Build with sdkconfig.bench (see docs/plc-protocol.md §6.4).
+
+endmenu

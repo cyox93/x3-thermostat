@@ -39,7 +39,10 @@ idf.py -p /dev/cu.usbmodem* flash monitor
 In non-interactive shells `idf.py` may be only an alias; call it as
 `"$HOME/.espressif/tools/python/v6.0/venv/bin/python" "$IDF_PATH/tools/idf.py" ...`.
 
-Config lives in `sdkconfig.defaults`; `sdkconfig` is generated.
+Config lives in `sdkconfig.defaults`; `sdkconfig` is generated. Bench-only code (the PLC
+MC200 stand-in, `CONFIG_SC_PLC_MC200_STANDIN`) is off by default and must stay out of the
+firmware for the real boiler bus; build it separately with
+`-B build-bench -D SDKCONFIG=build-bench/sdkconfig -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.bench"`.
 
 There are no tests — this is firmware that runs on hardware. Back behavioural claims
 with evidence from the bench, not with reasoning alone.

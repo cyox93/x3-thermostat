@@ -56,6 +56,7 @@ defaults로 옮긴다).
 | `plc` | PLC 마지막 그룹 · 수신 / 오류 / 송신 카운트 (plcloop) |
 | `plc_mon <on\|off>` | PLC 프레임마다 출력 |
 | `plc_send <hex>...` | 바이트마다 PLC 프레임 송신, 예 `plc_send 83 01 04` (plcloop). 실제 버스에 나간다 |
+| `plc_mc200 [on\|off [<주소>]]` | 벤치 빌드(`sdkconfig.bench`)에만 있다: MC200 대신 조절기 하나를 폴링하고 답한다 (`docs/plc-protocol.md` §6.4) |
 | `sysinfo` | sysloop이 가진 온습도 · 조도 · x3-switch 상태 |
 | `get_ver` | 펌웨어 버전 |
 | `help` | 전체 목록 (시스템 명령 포함) |

@@ -25,6 +25,9 @@ static const char* TAG = "plcloop";
 
 /* Timer ids */
 static const int PLCLOOP_GROUP_TIMER_ID = 1;
+#if CONFIG_SC_PLC_MC200_STANDIN
+static const int PLCLOOP_MC200_TIMER_ID = 2;
+#endif
 
 /* Frames arrive a whole message at a time, when the message ends. An answer
  * then lands 60~95 ms after its poll, and the next poll ~127 ms or more after
@@ -48,6 +51,22 @@ static const int PLCLOOP_GROUP_TIMER_ID = 1;
  * can be logged by another machine while decoding the codes. */
 #define _DUMP_UART          UART_NUM_0
 #define _DUMP_BAUD          115200
+
+#if CONFIG_SC_PLC_MC200_STANDIN
+/*
+ * Bench only (CONFIG_SC_PLC_MC200_STANDIN, off in the real firmware): MC200
+ * stand-in for a bus with one DT-200 or LT200SPD, to see whether a device
+ * accepts our frames. Answers are replayed from the bus log
+ * (docs/plc-protocol.md §5.6); nothing here is policy.
+ */
+#define _MC200_TICK_MS      10
+#define _MC200_PERIOD_US    254000  /* poll to poll, §2 */
+#define _MC200_QUIET_US     130000  /* after the last traffic, before the next poll */
+#define _MC200_DROP_US      9000000 /* unanswered this long → deregistered, §5.6 */
+#define _MC200_DT200        0x01    /* DT-200 address; a room is its number + 1 */
+#define _MC200_REGISTERED   0x40
+#define _MC200_HOT_WATER    0x78    /* item 3B value as logged; meaning inferred */
+#endif
 
 typedef struct _plc_send_data {
     uint8_t len;
@@ -77,6 +96,22 @@ typedef struct _plcloop {
     uint32_t err_no_start;
     uint32_t err_bits;
     uint32_t sent;
+    _plc_send_data_t sending;   /* on the wire, joins the group when done */
+
+    int64_t bus_us;             /* last traffic, ours or not */
+#if CONFIG_SC_PLC_MC200_STANDIN
+    /* Bench MC200 stand-in */
+    bool mc200;
+    bool mc200_registered;
+    uint8_t mc200_addr;         /* the one device polled */
+    uint8_t mc200_rx[16];       /* message being received */
+    int mc200_rx_len;
+    int64_t poll_us;            /* last poll */
+    int64_t dev_us;             /* last message from the device */
+    _plc_send_data_t mc200_pending;   /* plc_send waiting for the next poll slot */
+    uint32_t mc200_polls;
+    uint32_t mc200_answers;
+#endif
 } _plcloop_t;
 
 static _plcloop_t *_plcloop;
@@ -170,13 +205,164 @@ static void _group_timer_cb(int id, void *arg, void *data)
     /* TODO: policy — interpret the group once the code meanings are known */
     _plcloop->last = *cur;
     cur->len = 0;
+#if CONFIG_SC_PLC_MC200_STANDIN
+    /* A message never spans groups */
+    _plcloop->mc200_rx_len = 0;
+#endif
 }
+
+static void _group_add(uint8_t byte)
+{
+    _plc_group_t *cur = &_plcloop->cur;
+    if (cur->len < _GROUP_MAX) {
+        cur->data[cur->len++] = byte;
+    } else {
+        _plcloop->overflows++;
+    }
+    sc_eventloop_add_timer(_plcloop->loop, PLCLOOP_GROUP_TIMER_ID, _group_timer_cb, NULL, _GROUP_GAP_MS, false);
+}
+
+/* Send from the loop thread. What we send joins the group once it is on
+ * the bus, so the dump shows both sides in bus order; its echo is dropped. */
+static esp_err_t _send(const uint8_t *data, size_t len)
+{
+    /* TODO: listen before talk — wait for a quiet bus between groups */
+    esp_err_t ret = sc_plc_send(data, len);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "send failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    _plcloop->sending.len = len;
+    memcpy(_plcloop->sending.data, data, len);
+    _plcloop->bus_us = esp_timer_get_time();
+    return ESP_OK;
+}
+
+#if CONFIG_SC_PLC_MC200_STANDIN
+
+/* ========== Bench MC200 stand-in ========== */
+
+/* Fill in the header length and checksum, then send */
+static esp_err_t _mc200_send(uint8_t *msg, int len)
+{
+    uint32_t sum = 0;
+    msg[0] = (msg[0] & 0xF0) | len;
+    for (int i = 0; i < len - 1; i++) sum += msg[i];
+    msg[len - 1] = sum & _MSG_SUM_MASK;
+    return _send(msg, len);
+}
+
+/* DT-200 reads an MC200 item: answer with what the MC200 answered on the
+ * real bus (lt200spd log). Unknown items get no answer. */
+static void _mc200_read(uint8_t item)
+{
+    uint8_t m[8] = { 0, _MC200_DT200, item };
+
+    switch (item) {
+    case 0x1E: { /* connect: ack, then read its full state as the MC200 did */
+        uint8_t both[7] = { 0xB3, _MC200_REGISTERED | _MC200_DT200, 0, 0x94, _MC200_DT200, 0x1E, 0 };
+        both[2] = (both[0] + both[1]) & _MSG_SUM_MASK;
+        both[6] = (both[3] + both[4] + both[5]) & _MSG_SUM_MASK;
+        _plcloop->mc200_registered = true;
+        if (_send(both, sizeof(both)) == ESP_OK) _plcloop->mc200_answers++;
+        return;
+    }
+    case 0x3B: m[0] = 0xA0; m[3] = _MC200_HOT_WATER; m[4] = 0x00; _mc200_send(m, 6); break;
+    case 0x39: m[0] = 0xA0; m[3] = 0x00; _mc200_send(m, 5); break;
+    case 0x36: m[0] = 0xA0; m[3] = 0x02; _mc200_send(m, 5); break;
+    case 0x37: m[0] = 0xA0; m[3] = 0x04; _mc200_send(m, 5); break;
+    case 0x3F: m[0] = 0xA0; m[3] = 0x22; _mc200_send(m, 5); break;
+    case 0x3D: m[0] = 0xA0; m[3] = 0x12; m[4] = 0x78; m[5] = 0xA0; _mc200_send(m, 7); break;
+    case 0x3E: m[0] = 0xA0; m[3] = 0x12; m[4] = 0x01; m[5] = 0x0C; _mc200_send(m, 7); break;
+    default:
+        ESP_LOGW(TAG, "mc200: no answer for item %02X", item);
+        return;
+    }
+    _plcloop->mc200_answers++;
+}
+
+static void _mc200_message(const uint8_t *m, int len)
+{
+    _plcloop->dev_us = esp_timer_get_time();
+    /* A room that still counts itself registered (e.g. after our reboot)
+     * answers the scan poll with E4 instead of CA: any answer registers it */
+    bool was_registered = _plcloop->mc200_registered;
+    _plcloop->mc200_registered = true;
+
+    switch (m[0] & 0xF0) {
+    case 0xD0:  /* D4 <addr> <item> */
+        _mc200_read(m[2]);
+        break;
+    case 0xC0: { /* C5 / C6 notify, or CA full state that registers a room: ack.
+                  * The DT-200's CA answers our 94 read and gets none. */
+        if ((m[0] & 0x0F) == 0x0A && was_registered) break;
+        uint8_t ack[3] = { 0xB0, _MC200_REGISTERED | _plcloop->mc200_addr };
+        if (_mc200_send(ack, 3) == ESP_OK) _plcloop->mc200_answers++;
+        break;
+    }
+    default:    /* E4 answer, F5 for a room we don't have */
+        break;
+    }
+}
+
+/* Gather one received byte into a message; handle it when complete */
+static void _mc200_rx(uint8_t byte)
+{
+    uint8_t *m = _plcloop->mc200_rx;
+    int *n = &_plcloop->mc200_rx_len;
+
+    if (*n == 0 && !(byte & _MSG_HEADER)) return;
+    m[(*n)++] = byte;
+
+    int len = m[0] & _MSG_LEN_MASK;
+    if (len < 2 || len > (int)sizeof(_plcloop->mc200_rx)) {
+        *n = 0;
+        return;
+    }
+    if (*n < len) return;
+    *n = 0;
+
+    uint32_t sum = 0;
+    for (int i = 0; i < len - 1; i++) sum += m[i];
+    if ((sum & _MSG_SUM_MASK) != m[len - 1]) return;
+    _mc200_message(m, len);
+}
+
+static void _mc200_timer_cb(int id, void *arg, void *data)
+{
+    int64_t now = esp_timer_get_time();
+
+    if (_plcloop->mc200_registered && now - _plcloop->dev_us > _MC200_DROP_US) {
+        ESP_LOGW(TAG, "mc200: DT-200 silent, deregistered");
+        _plcloop->mc200_registered = false;
+    }
+    if (sc_plc_tx_busy()) return;
+    if (now - _plcloop->poll_us < _MC200_PERIOD_US) return;
+    if (now - _plcloop->bus_us < _MC200_QUIET_US) return;
+
+    _plcloop->poll_us = now;
+
+    /* A setting goes out in place of the poll, as the MC200 sends A5 */
+    _plc_send_data_t *pending = &_plcloop->mc200_pending;
+    if (pending->len) {
+        _send(pending->data, pending->len);
+        pending->len = 0;
+        return;
+    }
+
+    uint8_t poll[3] = { 0x80, (_plcloop->mc200_registered ? _MC200_REGISTERED : 0) | _plcloop->mc200_addr };
+    _plcloop->mc200_polls++;
+    _mc200_send(poll, 3);
+}
+
+#endif
 
 static void _rx_event_handler(int id, void *arg, void *data)
 {
     int value = *(int *)data;
     uint8_t byte = value & 0xff;
 
+    _plcloop->bus_us = esp_timer_get_time();
     if (value & SC_PLC_RX_ECHO) {
         _plcloop->echoes++;
         if (_plcloop->monitor) printf("plc: echo %02X\n", byte);
@@ -186,13 +372,10 @@ static void _rx_event_handler(int id, void *arg, void *data)
     _plcloop->frames++;
     if (_plcloop->monitor) printf("plc: rx %02X\n", byte);
 
-    _plc_group_t *cur = &_plcloop->cur;
-    if (cur->len < _GROUP_MAX) {
-        cur->data[cur->len++] = byte;
-    } else {
-        _plcloop->overflows++;
-    }
-    sc_eventloop_add_timer(_plcloop->loop, PLCLOOP_GROUP_TIMER_ID, _group_timer_cb, NULL, _GROUP_GAP_MS, false);
+    _group_add(byte);
+#if CONFIG_SC_PLC_MC200_STANDIN
+    if (_plcloop->mc200) _mc200_rx(byte);
+#endif
 }
 
 /* Raw pulses of a burst that did not decode, as one UART0 line:
@@ -230,6 +413,12 @@ static void _rx_error_event_handler(int id, void *arg, void *data)
 static void _tx_done_event_handler(int id, void *arg, void *data)
 {
     _plcloop->sent++;
+    _plcloop->bus_us = esp_timer_get_time();
+
+    /* Added at the end, not the start: a send takes 12 ms a byte and the
+     * answer comes 60~95 ms after it, so the group gap must count from here */
+    for (int i = 0; i < _plcloop->sending.len; i++) _group_add(_plcloop->sending.data[i]);
+    _plcloop->sending.len = 0;
     if (_plcloop->monitor) printf("plc: tx done\n");
 }
 
@@ -237,11 +426,14 @@ static void _send_event_handler(int id, void *arg, void *data)
 {
     _plc_send_data_t *send = (_plc_send_data_t *)data;
 
-    /* TODO: listen before talk — wait for a quiet bus between groups */
-    esp_err_t ret = sc_plc_send(send->data, send->len);
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "send failed: %s", esp_err_to_name(ret));
+#if CONFIG_SC_PLC_MC200_STANDIN
+    /* While standing in for the MC200 the bus is ours: wait for a poll slot */
+    if (_plcloop->mc200) {
+        _plcloop->mc200_pending = *send;
+        return;
     }
+#endif
+    _send(send->data, send->len);
 }
 
 /* ========== API ========== */
@@ -313,8 +505,53 @@ static int _plc_send_cmd(int argc, char **argv)
     return sc_plcloop_send(data, n) == ESP_OK ? 0 : 1;
 }
 
+#if CONFIG_SC_PLC_MC200_STANDIN
+static struct { struct arg_str *state; struct arg_int *addr; struct arg_end *end; } _plc_mc200_args;
+
+static int _plc_mc200_cmd(int argc, char **argv)
+{
+    if (argc == 1) {
+        printf("mc200      : %s, address %d %s\n", _plcloop->mc200 ? "on" : "off", _plcloop->mc200_addr,
+               _plcloop->mc200_registered ? "registered" : "not registered");
+        printf("             %lu polls, %lu answers\n", _plcloop->mc200_polls, _plcloop->mc200_answers);
+        return 0;
+    }
+    if (arg_parse(argc, argv, (void **)&_plc_mc200_args) != 0) {
+        arg_print_errors(stderr, _plc_mc200_args.end, argv[0]);
+        return 1;
+    }
+    bool on = strcmp(_plc_mc200_args.state->sval[0], "on") == 0;
+    int addr = _plc_mc200_args.addr->count ? _plc_mc200_args.addr->ival[0] : _MC200_DT200;
+    if (addr < 1 || addr > 6) {
+        printf("address 1 (DT-200) or 2~6 (room + 1)\n");
+        return 1;
+    }
+    if (on && (!_plcloop->mc200 || addr != _plcloop->mc200_addr)) {
+        _plcloop->mc200_addr = addr;
+        _plcloop->mc200_registered = false;
+        _plcloop->mc200_rx_len = 0;
+        sc_eventloop_add_timer(_plcloop->loop, PLCLOOP_MC200_TIMER_ID, _mc200_timer_cb, NULL, _MC200_TICK_MS, true);
+    } else if (!on && _plcloop->mc200) {
+        sc_eventloop_del_timer(_plcloop->loop, PLCLOOP_MC200_TIMER_ID);
+    }
+    _plcloop->mc200 = on;
+    printf("mc200 %s\n", on ? "on" : "off");
+    return 0;
+}
+#endif
+
 static void _plcloop_cmd_init(void)
 {
+#if CONFIG_SC_PLC_MC200_STANDIN
+    _plc_mc200_args.state = arg_str1(NULL, NULL, "<on|off>", "act as the MC200 (bench bus only)");
+    _plc_mc200_args.addr = arg_int0(NULL, NULL, "<addr>", "device address, default 1 (DT-200)");
+    _plc_mc200_args.end = arg_end(2);
+    ESP_ERROR_CHECK(esp_console_cmd_register(&(esp_console_cmd_t){
+        .command = "plc_mc200", .help = "Bench only: poll and answer one device as the MC200 does",
+        .func = &_plc_mc200_cmd, .argtable = &_plc_mc200_args,
+    }));
+#endif
+
     ESP_ERROR_CHECK(esp_console_cmd_register(&(esp_console_cmd_t){
         .command = "plc", .help = "PLC bus status",
         .func = &_plc_cmd,
