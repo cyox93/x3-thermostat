@@ -2,6 +2,7 @@
 #include "freertos/FreeRTOS.h"
 #include "esp_log.h"
 #include "esp_check.h"
+#include "esp_timer.h"
 #include "driver/gpio.h"
 #include "driver/rmt_rx.h"
 #include "driver/rmt_tx.h"
@@ -38,6 +39,7 @@
  * in one receive (the decoder splits frames at each START) and re-arms in the
  * gap between messages instead. */
 #define _RX_IDLE_NS         (5000 * 1000)
+#define _ECHO_SLACK_US      3000    /* last carrier ends ~1.9 ms before the send does */
 /* Hardware filter caps near 3 µs; the shortest real pulse is ~28 µs */
 #define _RX_GLITCH_NS       2000
 /* One frame is 11 symbols. Devices answer right after the previous message
@@ -61,6 +63,7 @@ static rmt_symbol_word_t s_rx_buf[2][_RX_SYMBOLS];
 static int s_rx_idx;
 static rmt_symbol_word_t s_tx_buf[SC_PLC_SEND_MAX * _FRAME_SYMBOLS];
 static volatile bool s_tx_busy;
+static volatile int64_t s_tx_done_us;
 
 /* Last burst that did not decode, as level << 15 | µs (see sc_plc_get_error_burst) */
 static uint16_t s_err_burst[SC_PLC_BURST_MAX];
@@ -96,7 +99,7 @@ static void _save_burst(const rmt_symbol_word_t *sym, size_t num)
 /* Decode one burst — one or more frames — and report each. Only carrier-on
  * lengths matter; the lows are the cell remainder and carry nothing. A burst
  * with any bad frame is kept for sc_plc_get_error_burst. */
-static void _decode(const rmt_symbol_word_t *sym, size_t num)
+static void _decode(const rmt_symbol_word_t *sym, size_t num, bool echo)
 {
     bool started = false;
     bool saved = false;
@@ -117,7 +120,7 @@ static void _decode(const rmt_symbol_word_t *sym, size_t num)
         bool end = (i == num * 2);
         if (end || us > _RX_START_MIN_US) {
             if (started && bits == _FRAME_DATA_BITS) {
-                _notify(SC_PLC_EVENT_RX, value | (s_tx_busy ? SC_PLC_RX_ECHO : 0));
+                _notify(SC_PLC_EVENT_RX, value | (echo ? SC_PLC_RX_ECHO : 0));
             } else if (started || orphans || end) {
                 if (!saved) {
                     _save_burst(sym, num);
@@ -145,12 +148,17 @@ static bool _rx_done_cb(rmt_channel_handle_t chan, const rmt_rx_done_event_data_
     s_rx_idx ^= 1;
     rmt_receive(s_rx_chan, s_rx_buf[s_rx_idx], sizeof(s_rx_buf[0]), &s_rx_cfg);
 
-    _decode(edata->received_symbols, edata->num_symbols);
+    /* Our own send comes back as one burst that closes only after the idle
+     * time, when the send has already finished: a burst that closes within
+     * idle + one frame gap of the send's end is its echo */
+    bool echo = s_tx_busy || esp_timer_get_time() - s_tx_done_us < _RX_IDLE_NS / 1000 + _ECHO_SLACK_US;
+    _decode(edata->received_symbols, edata->num_symbols, echo);
     return false;
 }
 
 static bool _tx_done_cb(rmt_channel_handle_t chan, const rmt_tx_done_event_data_t *edata, void *arg)
 {
+    s_tx_done_us = esp_timer_get_time();
     s_tx_busy = false;
     _notify(SC_PLC_EVENT_TX_DONE, 0);
     return false;

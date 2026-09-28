@@ -17,8 +17,9 @@
 /* Max bytes (= frames) per sc_plc_send */
 #define SC_PLC_SEND_MAX     8
 
-/* Set in the RX value when the frame arrived while we were transmitting —
- * most likely our own carrier seen back through the module. */
+/* Set in the RX value for our own carrier seen back through the module: a
+ * burst that closes during a send or just after it (it closes only after the
+ * RX idle time, so the echo of a send decodes once the send has finished). */
 #define SC_PLC_RX_ECHO      0x100
 
 typedef enum {
