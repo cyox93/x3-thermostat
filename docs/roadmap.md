@@ -10,7 +10,7 @@
 | ESP32-S3-WROOM-1-N16R8로 타깃 전환 (16 MB · Octal PSRAM · 파티션 · USB Serial/JTAG) | ✅ 빌드 확인 |
 | 핀을 `board.h`로 모으고 main-board 설계 핀으로 교체 | ✅ 빌드 확인, **실기 미확인** |
 | 조도 센서 ALS-PT19-315C 드라이버 (`als_read`, 대략 lux, R_L 100 kΩ) | ✅ 빌드 확인, 센서 미연결 |
-| 온습도 드라이버 `temp_humid` (AHT25, `temp_get`) | ✅ 빌드 확인, 센서 미연결 |
+| 온습도 드라이버 `temp_humid` (AHT25, `temp_get`) | ✅ 실기 확인 (개발 보드, 2026-09-29) |
 | x3-switch 드라이버 + switchloop (AT 클라이언트, 상태 동기화, CLICK/LONG) | ✅ 빌드 확인, **실기 미확인** |
 | loop 구조 (`main/` mainloop · switchloop · sysloop, eventloop 기반) | ✅ 빌드 확인 |
 | 밝기 3단계 (NORMAL / DIM / NIGHT) — 임시 사양 | ✅ 빌드 확인 |
@@ -43,7 +43,8 @@
 - [ ] 엔코더 — 한 칸당 카운트(`ENCODER_COUNTS_PER_DETENT` = 2 가정) · **방향 부호** 확인, 패널 쪽 풀업 유무 → R11 · R12 실장 결정
 - [ ] SPI 클럭 · 직렬 저항 — FFC 길이 확정 후 파형으로
 - [ ] 불명 신호 IO8 관찰 (ADC 값 로그)
-- [ ] 온습도(AHT25): `temp_get`으로 응답 · CRC · 값 확인, R14 · R15 실장 상태에서
+- [x] 온습도(AHT25): `temp_get` 응답 · 값 확인 (개발 보드: 27.0°C / 46.5%RH, sysloop 10 s 주기 측정도 `sysinfo`로 확인)
+- [ ] 온습도(AHT25): main-board에서 R14 · R15 실장 상태로 다시 확인
 - [ ] 센서 없이 보드만 켤 때는 `bright normal` — 안 하면 20 s 뒤 NIGHT로 화면이 꺼진다
 - [ ] 조도 센서 (R_L 100 kΩ): 소등 · 스탠드 · 천장 조명에서 `als_read` 값 기록 → 경계값(3 / 8 / 30 / 60 lux) 확인
 
