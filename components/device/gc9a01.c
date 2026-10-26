@@ -9,6 +9,9 @@
 #include "esp_lcd_panel_commands.h"
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
+#include "esp_private/gpio.h"
+#include "esp_rom_sys.h"
+#include "soc/spi_pins.h"
 #include "esp_log.h"
 #include "esp_check.h"
 #include "esp_console.h"
@@ -344,6 +347,76 @@ static int cmd_lcd_color(int argc, char **argv)
     return 0;
 }
 
+/* The panel has no MISO; GC9A01 answers reads on SDA (3-wire read). The SPI
+ * device owns the pins, so take them as GPIO, bit-bang at ~100 kHz, then hand
+ * the IOMUX pins back to FSPI. A reply proves the controller hears commands. */
+#define LCD_BB_HALF_US 5
+
+static void lcd_bb_clock_out(uint8_t b)
+{
+    for (int i = 7; i >= 0; i--) {
+        gpio_set_level(GC9A01_PIN_MOSI, (b >> i) & 1);
+        esp_rom_delay_us(LCD_BB_HALF_US);
+        gpio_set_level(GC9A01_PIN_SCLK, 1);
+        esp_rom_delay_us(LCD_BB_HALF_US);
+        gpio_set_level(GC9A01_PIN_SCLK, 0);
+    }
+}
+
+static uint64_t lcd_bb_read(uint8_t cmd, int bits)
+{
+    gpio_set_direction(GC9A01_PIN_MOSI, GPIO_MODE_OUTPUT);
+    gpio_set_level(GC9A01_PIN_DC, 0);
+    gpio_set_level(GC9A01_PIN_CS, 0);
+    esp_rom_delay_us(LCD_BB_HALF_US);
+    lcd_bb_clock_out(cmd);
+    gpio_set_direction(GC9A01_PIN_MOSI, GPIO_MODE_INPUT);
+    gpio_set_level(GC9A01_PIN_DC, 1);
+    uint64_t v = 0;
+    for (int i = 0; i < bits; i++) {
+        esp_rom_delay_us(LCD_BB_HALF_US);
+        gpio_set_level(GC9A01_PIN_SCLK, 1);
+        v = (v << 1) | gpio_get_level(GC9A01_PIN_MOSI);
+        esp_rom_delay_us(LCD_BB_HALF_US);
+        gpio_set_level(GC9A01_PIN_SCLK, 0);
+    }
+    gpio_set_level(GC9A01_PIN_CS, 1);
+    esp_rom_delay_us(LCD_BB_HALF_US * 4);
+    return v;
+}
+
+static int cmd_lcd_id(int argc, char **argv)
+{
+    gpio_config_t cfg = {
+        .pin_bit_mask = (1ULL << GC9A01_PIN_SCLK) | (1ULL << GC9A01_PIN_CS) | (1ULL << GC9A01_PIN_MOSI),
+        .mode = GPIO_MODE_INPUT_OUTPUT,
+    };
+    gpio_set_level(GC9A01_PIN_CS, 1);
+    gpio_set_level(GC9A01_PIN_SCLK, 0);
+    gpio_config(&cfg);
+
+    /* Lengths include the dummy clock some reads start with; print raw bits. */
+    static const struct { uint8_t cmd; int bits; const char *name; } reads[] = {
+        {0x04, 25, "RDDID (dummy+ID1..3)"},
+        {0x09, 33, "RDDST (dummy+status)"},
+        {0x0A, 9,  "RDDPM (power mode)"},
+        {0xDA, 9,  "RDID1"},
+        {0xDB, 9,  "RDID2"},
+        {0xDC, 9,  "RDID3"},
+    };
+    for (int i = 0; i < sizeof(reads) / sizeof(reads[0]); i++) {
+        uint64_t v = lcd_bb_read(reads[i].cmd, reads[i].bits);
+        printf("%02X %-22s raw=0x%0*llX (%d bits)\n", reads[i].cmd, reads[i].name,
+               (reads[i].bits + 3) / 4, (unsigned long long)v, reads[i].bits);
+    }
+
+    gpio_set_direction(GC9A01_PIN_MOSI, GPIO_MODE_OUTPUT);
+    gpio_iomux_output(GC9A01_PIN_SCLK, SPI2_FUNC_NUM);
+    gpio_iomux_output(GC9A01_PIN_MOSI, SPI2_FUNC_NUM);
+    gpio_iomux_output(GC9A01_PIN_CS, SPI2_FUNC_NUM);
+    return 0;
+}
+
 esp_err_t sc_lcd_init(void)
 {
     ESP_RETURN_ON_ERROR(gc9a01_init(&s_lcd), TAG, "init failed");
@@ -355,6 +428,10 @@ esp_err_t sc_lcd_init(void)
     ESP_ERROR_CHECK(esp_console_cmd_register(&(esp_console_cmd_t){
         .command = "lcd_color", .help = "Fill LCD with RGB color",
         .func = &cmd_lcd_color, .argtable = &lcd_color_args,
+    }));
+    ESP_ERROR_CHECK(esp_console_cmd_register(&(esp_console_cmd_t){
+        .command = "lcd_id", .help = "Read panel ID/status over SDA (bit-banged 3-wire read)",
+        .func = &cmd_lcd_id,
     }));
 
     return ESP_OK;
