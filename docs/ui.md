@@ -64,15 +64,17 @@ components/
   ui/
     sources.cmake       ESP 빌드와 sim이 함께 쓰는 소스 목록
     ui_input.c          입력 → app_state 디스패치, 플래시 판단            ┐ sim과 공유
-    ui_test.c           시험 명령 해석 · 실행 (RESET · STATE · DUMP …)     │ (sources.cmake)
-    theme.c             색 토큰 · 폰트 포인터                              │
+    ui_test.c           시험 명령 해석 · 실행 (RESET · 상태 명령 · DUMP …)  │ (sources.cmake)
+    ui_util.c           라벨 · 상자 만들기 도우미                           │
+    ui_screens.c        모드 → 화면 고르기, 모든 refresh 호출               │
     screen_main.c screen_settings.c screen_edit_room.c screen_edit_value.c │
     widget_gauge.c widget_focus_list.c widget_flame.c widget_room_summary.c│
     widget_wifi.c widget_flash.c                                          ┘
     fonts/ icons/       lv_font_conv · 이미지 변환 결과 (커밋)
     ui_router.c         device 전용 — LVGL 포트, 큐 수신, 깨우기 · 화면시간 · 백라이트, NVS 저장, 콘솔 명령
   include/
-    ui.h app_state.h settings.h theme.h
+    ui.h app_state.h settings.h
+    theme.h             색 토큰 · 폰트 선언 (헤더만)
     ui_geometry.h       좌표 · 반지름 · 각도의 유일한 원본 (design/src/boiler-app.jsx와 쌍)
 tools/
   fonts/build_fonts.sh  TTF → components/ui/fonts/font_*.c
@@ -200,10 +202,10 @@ UI가 소유한 출력은 UI의 명령으로만 바꾼다 (`architecture.md` §3
 | 원호 게이지 | 트랙 · 값 `lv_arc` (노브 숨김), 디자인 각 −130°~+130° → LVGL `bg_angles(140, 40)` |
 | 눈금 · 현재온도 마커 | `lv_line`, 점은 `ui_geometry.h` 값으로 미리 계산 |
 | 슬롯 목록 (설정 · 방 선택) | `widget_focus_list` — 거리 0/1/2+ → 크기 1.0/0.74/0.55, 투명도 1.0/0.45/0.18, 300 ms ease-out |
-| 불꽃 | SVG → A8 이미지 + recolor. 크기는 정수로 올림: 14×18 · 10×13 · 9×11. 컬러는 바깥 · 안쪽 두 장을 겹친다. 배지 애니메이션은 `lv_image_set_scale_x/y`로 근사 |
+| 불꽃 | `design/tools/build-icons.mjs`가 Chrome으로 SVG를 그려 C 배열로 만든다. 크기는 정수로 올림: 14×18 · 10×13 · 9×11. 컬러(14 · 10)는 ARGB8888 한 장, 단색(10 · 9)은 A8 + `image_recolor`. 배지 애니메이션은 `lv_image_set_scale_x/y`로 근사 |
 | 방 요약 줄 | 칸마다 불꽃 자리를 항상 잡고 아이콘만 숨긴다 (글자가 움직이지 않게) |
 | 누름 플래시 | `lv_layer_top()` 오버레이 하나. 그라데이션 대신 단색 반투명 원, 세리프 이탤릭 대신 Pretendard 600 32 px. 투명도 0→1 (150 ms) → 0 (450 ms) |
-| WiFi 상태바 | golden과 같이 아이콘 + `3/3` (레벨 0이면 `OFF`). 레벨은 `app_state` 값 |
+| WiFi 상태바 | golden과 같이 아이콘 + `3/3` (레벨 0이면 `OFF`). 아이콘은 레벨별 ARGB8888 4장 (호마다 색 · 투명도가 달라 recolor로는 안 된다). 레벨은 `app_state` 값 |
 
 ### 4.1 폰트
 
@@ -260,7 +262,8 @@ UI가 소유한 출력은 UI의 명령으로만 바꾼다 (`architecture.md` §3
 - **실행은 항상 UI 스레드에서 한다.** 실기의 콘솔 핸들러는 콘솔 태스크에서 돌므로, 명령 줄을 UI 큐에
   넣고 세마포어로 기다린다. LVGL 태스크가 `ui_test` 실행 · 응답 출력(SNAP의 긴 줄 포함)까지 마치고
   세마포어를 놓는다. sim에서는 SDL · LVGL 메인 루프가 TCP 줄을 받아 그 자리에서 실행한다.
-- `STATE`는 `#if` 로 sim 빌드에서만 컴파일한다 (cJSON 의존이 실기에 들어가지 않게).
+- 명령은 모두 공백으로 나뉜 짧은 줄이다 — 콘솔의 인자 8개 · 256자 제한 안에 들어가므로 실기와 sim이
+  같은 명령을 받는다. JSON은 받지 않는다.
 
 | 명령 | 동작 | 응답 | 실기 |
 |---|---|---|---|
@@ -268,7 +271,11 @@ UI가 소유한 출력은 UI의 명령으로만 바꾼다 (`architecture.md` §3
 | `ENC+` / `ENC-` | 인코더 1 tick | `OK` | ✅ |
 | `SHORT` / `LONG` / `ROOM` | 버튼 | `OK` | ✅ |
 | `BURN <방이름> <0\|1>` | 연소 신호 (`scenarios.json`의 `{"burn":["큰방",true]}`) | `OK` | ✅ |
-| `STATE <json>` | golden 항목 하나를 적용 (§6.3) | `OK` | sim만 — 콘솔은 줄 256자 · 인자 8개 제한 |
+| `MODE <mode>` | 모드를 바로 바꾼다 (`DUMP`의 mode 문자열) | `OK` | ✅ |
+| `INSTALL <방>` / `ACTIVE <방>` | 설치 방 · 활성 방 | `OK` | ✅ |
+| `ROOM <방> <on> <target×10> <cur×10\|-> <hum\|-> <burn>` | 방 하나의 값 전부 (`-` = 값 없음) | `OK` | ✅ |
+| `SEL <n>` | 현재 목록 모드의 선택 (설정 0~3, 방 선택 0~3) | `OK` | ✅ |
+| `BRIGHT <10-100>` / `STIME <초>` / `WIFI <0-3>` | 화면밝기 · 화면시간 · WiFi 레벨 | `OK` | ✅ |
 | `DUMP` | 상태 JSON 한 줄 (아래 형식) | `{...}` | ✅ |
 | `SNAP` | 화면 240×240 RGB565 raw, base64 한 줄 (약 150 KB). 실기는 출력 동안 로그를 멈춘다 | `SNAP <base64>` | ✅ |
 | `ANIM 0\|1` | 애니메이션 · **누름 플래시** 끄기 · 켜기 (HTML `?test=1`과 같게) | `OK` | ✅ |
@@ -283,12 +290,13 @@ UI가 소유한 출력은 UI의 명령으로만 바꾼다 (`architecture.md` §3
 
 - `mode`: `main` · `settings` · `edit-room` · `edit-brightness` · `edit-screenTime`
 - 값이 없는 `current` · `humidity`는 `null`
-- JSON은 손으로 쓴다 (작고 고정된 형식). `STATE` 해석만 sim에서 cJSON을 쓴다
+- JSON은 손으로 쓴다 (작고 고정된 형식)
 
-### 6.3 golden 항목 → 상태 (`STATE`)
+### 6.3 golden 항목 → 시험 명령 (`render-sim.mjs`)
 
 `npm run golden`이 쓰는 `states.json`은 `design/src/golden-states.jsx`의 `GOLDEN` 배열이다.
-온습도는 항목에 없고 그 파일의 상수 `TEMPS` · `HUMS`다. `STATE`는 이렇게 옮긴다.
+온습도는 항목에 없고 그 파일의 상수 `TEMPS` · `HUMS`다. `render-sim.mjs`가 항목마다 `RESET` 뒤
+§6.2의 상태 명령으로 이렇게 옮긴다.
 
 | `kind` | 상태 |
 |---|---|
@@ -298,8 +306,8 @@ UI가 소유한 출력은 UI의 명령으로만 바꾼다 (`architecture.md` §3
 | `bright` | mode EDIT_BRIGHTNESS, 값 = `value` |
 | `time` | mode EDIT_SCREENTIME, 값 = `value` (초) |
 
-`STATE`는 먼저 `RESET` 상태로 돌린 뒤 항목을 적용한다 — 앞 항목의 값이 다음 항목에 남지 않게.
-항목에 없는 방은 `RESET` 값 그대로다. `TEMPS` · `HUMS`는 `ui_test.c`에 같은 값으로 둔다.
+항목마다 `RESET`부터 하므로 앞 항목의 값이 다음 항목에 남지 않는다. 항목에 없는 방은 `RESET` 값
+그대로다. `TEMPS` · `HUMS`는 `render-sim.mjs`와 `ui_test.c`(RESET)에 같은 값으로 둔다.
 애니메이션은 끈 상태로 찍는다.
 
 ### 6.4 비교 절차
@@ -307,7 +315,7 @@ UI가 소유한 출력은 UI의 명령으로만 바꾼다 (`architecture.md` §3
 `design/TESTING.md`를 따른다. 스크립트는 모두 `design/tools/`에 둔다.
 
 1. `npm run golden` → `golden/*.png` 29장 + `golden/states.json`
-2. `render-sim.mjs`: sim에 항목마다 `ANIM 0` · `STATE` · `SNAP` → `out/lvgl/<id>.png` → `npm run diff`
+2. `render-sim.mjs`: sim에 항목마다 `ANIM 0` · `RESET` · 상태 명령 · `SNAP` → `out/lvgl/<id>.png` → `npm run diff`
    (원 안쪽 2% 초과면 FAIL)
 3. `scenarios.json`을 HTML(`npm run replay`) · sim(`replay-sim.mjs`) · 실기(`replay-serial.mjs`)에 재생해
    `DUMP`를 `expect`와 비교하고, 화면은 `compare.mjs`로 HTML 결과와 비교한다
@@ -332,13 +340,13 @@ UI가 소유한 출력은 UI의 명령으로만 바꾼다 (`architecture.md` §3
 | `main/main.h` | `sc_sysinfo_t.screen_on`은 UI가 알려 준 값으로 (sysinfo 표시용) |
 | `components/device/led.c` | `led_on` · `led_brightness` 콘솔 명령 삭제 — 백라이트는 UI가 소유한다 (출력은 소유자의 명령으로만). 대신 `ui bright` · `ui screen` (§3.5) |
 | `components/device/gc9a01.c` | `lcd_color` · `lcd_id`는 bring-up용으로 남기고, LVGL이 다음 갱신에서 덮는다고 도움말에 적는다 |
-| `components/core/console.c` | 그대로 (STATE는 sim 전용이라 줄 길이를 늘리지 않는다) |
+| `components/core/console.c` | 그대로 (시험 명령은 모두 짧은 줄이라 줄 길이를 늘리지 않는다) |
 | `docs/architecture.md` §3 · §3.5, CLAUDE.md 하드웨어 함정 7, `README.md` 명령 목록, `docs/roadmap.md` `uiloop.c` 항목 | 위 변경에 맞춘다 |
 
 ## 8. 순서
 
 | 단계 | 내용 | 끝난 기준 |
 |---|---|---|
-| 1 | LVGL · 포트 · theme · 폰트 · `ui_geometry.h`, MAIN 화면, sim + TCP `ANIM` · `STATE` · `SNAP` · `render-sim.mjs` | MAIN 계열 golden PASS (sim), 실기에 MAIN 표시 |
+| 1 | LVGL · 포트 · theme · 폰트 · `ui_geometry.h`, MAIN 화면, sim + TCP 시험 명령 (`RESET` · 상태 명령 · `ANIM` · `SNAP`) · `render-sim.mjs` | MAIN 계열 golden PASS (sim), 실기에 MAIN 표시 |
 | 2 | SETTINGS · EDIT 화면, 플래시, 마스터 요소, `ui_input.c` 상태 머신 전부 | golden 29장 PASS (sim) |
 | 3 | 나머지 시험 명령 · 실기 `ui test` · `ui` 콘솔 명령, `replay-sim.mjs` · `replay-serial.mjs`, sysloop 연결, NVS, §7 정리 | `scenarios.json` sim · 실기 통과, §6.5 실기 확인 |

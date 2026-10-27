@@ -1,0 +1,16 @@
+{
+  "name": "x3-thermostat-visual-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "serve": "npx http-server .. -p 8080 -c-1 --silent",
+    "golden": "node capture-golden.mjs http://localhost:8080/golden.html golden",
+    "replay": "node replay-html.mjs http://localhost:8080/index.html scenarios.json out/html",
+    "diff": "node compare.mjs golden out/lvgl out/diff"
+  },
+  "dependencies": {
+    "pixelmatch": "^6.0.0",
+    "pngjs": "^7.0.0",
+    "puppeteer": "^23.0.0"
+  }
+}

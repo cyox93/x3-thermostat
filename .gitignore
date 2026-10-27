@@ -14,3 +14,14 @@ dependencies.lock
 
 # OS
 .DS_Store
+
+# Local implementation plans
+docs/plans/
+
+# UI tools output
+design/tools/golden/
+design/tools/out/
+design/tools/node_modules/
+design/tools/package-lock.json
+tools/sim/build/
+tools/fonts/src/

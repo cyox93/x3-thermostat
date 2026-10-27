@@ -1,0 +1,233 @@
+# Handoff: x3 Thermostat — 보일러 리모컨 UI (ESP32 + LVGL)
+
+## Overview
+1.28" 원형 LCD(240×240)를 쓰는 방별 보일러 온도조절기 UI입니다. 입력은 **로터리 인코더 1개 + 푸시 버튼 1개**이고 터치는 없습니다. 거실에 설치된 기기("마스터")에만 **방전환(ROOM) 버튼**이 하나 더 있고, 다른 방의 보일러도 제어할 수 있습니다.
+
+**구현 대상:** ESP32 + LVGL(8.x 또는 9.x — 프로젝트 설정에 맞추세요). 디스플레이 드라이버는 GC9A01 계열 240×240 원형을 가정합니다.
+
+## About the Design Files
+이 번들의 HTML/JSX 파일은 **디자인 레퍼런스**입니다. 의도한 모양과 동작을 보여주는 브라우저용 프로토타입이며, 그대로 옮겨 쓸 코드가 아닙니다. 할 일은 이 디자인을 **ESP32 펌웨어 안에서 LVGL로 다시 구현**하는 것입니다. 프로젝트에 이미 있는 구조(ESP-IDF 또는 Arduino, 디스플레이·입력 드라이버, 태스크 구조)를 따르세요.
+
+- `index.html`: 디바이스 시뮬레이터. 브라우저에서 열면 됩니다. 휠/드래그 = 인코더, PUSH 클릭 또는 Space = 버튼(길게 누르면 길게 누름), R 키 = ROOM 버튼.
+- `boiler-review.html`: 모든 화면 상태를 한 페이지에 모은 리뷰 문서.
+- `src/boiler-app.jsx`: 모든 화면과 상태 로직. **수치는 이 파일이 기준입니다.**
+
+## Fidelity
+**High-fidelity.** 색, 크기, 위치, 폰트 크기가 최종값입니다. 아래 좌표는 모두 240×240 화면 픽셀 기준이며, 중심은 (120, 120)입니다.
+
+---
+
+## Hardware / Input
+| 입력 | 동작 |
+|---|---|
+| 인코더 회전 | 1 detent = 1 tick (+1 시계방향 / −1 반시계방향) |
+| 버튼 짧게 | 뗄 때 발생. 누른 시간 < 500ms |
+| 버튼 길게 | 누른 채 500ms가 지나는 순간 발생. 이후 뗄 때 짧게 누름은 발생하지 않음 |
+| ROOM 버튼 | 거실 기기에만 있음. 짧게 누름만 사용 |
+
+## State Model
+```c
+typedef enum { MODE_MAIN, MODE_SETTINGS, MODE_EDIT_ROOM, MODE_EDIT_BRIGHTNESS, MODE_EDIT_SCREENTIME } ui_mode_t;
+typedef enum { ROOM_LIVING, ROOM_BIG, ROOM_WORK, ROOM_PLAY, ROOM_COUNT } room_t; // 거실, 큰방, 일하는방, 노는방
+
+typedef struct {
+  bool   on;          // 사용자가 켜고 끄는 보일러 전원
+  float  target;      // 희망온도 15.0–30.0, 0.5 단위 (기본 22.0)
+  float  current;     // 센서 측정 온도
+  float  humidity;    // 센서 측정 습도 % (0–100)
+  bool   burning;     // 보일러가 보내는 실제 연소 신호 (입력값. UI는 표시만 함)
+} room_state_t;
+
+struct {
+  ui_mode_t mode;
+  room_t installed_room;   // 설정 > 방선택에서 지정. NVS에 저장
+  room_t active_room;      // 지금 제어 중인 방. 마스터가 아니면 항상 installed_room
+  room_state_t rooms[ROOM_COUNT];
+  uint8_t settings_sel;    // 0..3
+  room_t  room_edit_sel;
+  uint8_t brightness;      // 10–100, 5 단위 (기본 70). NVS에 저장
+  uint16_t screen_time_s;  // {10,20,30,60,120,300} 중 하나 (기본 30). NVS에 저장
+} ui;
+
+#define IS_MASTER (ui.installed_room == ROOM_LIVING)
+```
+
+## Interaction Table
+| mode | 인코더 tick | 짧게 | 길게 | ROOM (마스터 전용) |
+|---|---|---|---|---|
+| MAIN | `on`일 때만 target ±0.5, 15–30 범위로 제한. `off`일 때는 무시 | `on` 토글 + 플래시 "ON"/"OFF" | → SETTINGS (sel=0) + 플래시 "설정" | active_room = (active_room+1) % 4 + 플래시 방이름 |
+| SETTINGS | sel ±1, 4개 항목 순환 | sel=방선택 → EDIT_ROOM (room_edit_sel = installed_room) · 화면밝기 → EDIT_BRIGHTNESS · 화면시간 → EDIT_SCREENTIME · 이전 → MAIN + 플래시 "이전" | 무시 | 무시 |
+| EDIT_ROOM | room_edit_sel ±1, 4개 순환 | installed_room = active_room = room_edit_sel → SETTINGS + 플래시 방이름 | 무시 | 무시 |
+| EDIT_BRIGHTNESS | ±5, 10–100 범위로 제한. 백라이트에 즉시 반영 | → SETTINGS + 플래시 "확인" | 무시 | 무시 |
+| EDIT_SCREENTIME | 단계 ±1, 0–5 범위로 제한 | → SETTINGS + 플래시 "확인" | 무시 | 무시 |
+
+- 마스터가 아닌 기기에서는 ROOM 버튼이 없습니다(또는 무시합니다).
+- **밝기:** 백라이트 PWM 듀티로 구현합니다. 시뮬레이터는 화면 투명도 `0.35 + 0.65 × b/100`로 흉내만 냈습니다.
+- **화면시간:** 마지막 입력 후 이 시간이 지나면 백라이트를 끕니다. 화면이 꺼진 상태에서 들어온 첫 입력은 화면만 켜고 동작은 하지 않는 것을 권장합니다(시뮬레이터에는 구현되지 않음).
+
+---
+
+## Design Tokens
+| 토큰 | 값 | 용도 |
+|---|---|---|
+| bg | `#0E0E10` | 화면 배경 |
+| bg2 | `#1A1A1D` | 원호 트랙 |
+| fg | `#F5F3EE` | 주 텍스트, 활성 눈금 |
+| dim | `#7A7A80` | 보조 텍스트, 비활성 눈금 |
+| accent | `#E88A5E` | 보일러 주황: 원호 값, 희망온도 라벨, 선택 값 |
+| flame-inner | `#FFD27A` | 불꽃 안쪽 |
+| current-marker | `#7FC8D4` | 현재 온도 마커 |
+| setting-accent | `#CFCFCF` | 설정 관련 플래시 |
+| gray-on | `#B8B8BC` | 방 요약: 켜진 방, 활성 박스 |
+| gray-off | `#4A4A50` | 방 요약: 꺼진 방, 보일러 대기 불꽃 |
+| badge-on-text | `#D8D6D0` | "보일러" 텍스트 (연소 중) |
+| badge-off-text | `#5A5A60` | "보일러" 텍스트 (대기) |
+
+### Fonts
+- **한글/일반:** Pretendard (400/500/600)
+- **큰 숫자:** Inter Tight 200 (ExtraLight). 숫자, `.`, `°`, `%`, `OFF`, `분`, `초`만 필요합니다. `분`/`초`는 Inter Tight에 없으므로 같은 크기의 Pretendard로 대체합니다.
+- **값 표시:** JetBrains Mono 400 (설정 목록의 값 `70%`, `30초`, `거실`). 한글이 섞이면 Pretendard로 대체합니다.
+
+`lv_font_conv`로 **사용하는 글자만** 변환하세요(4bpp 권장). 필요한 조합:
+
+| 폰트 | 크기(px) | 쓰는 곳 |
+|---|---|---|
+| Pretendard 500 | 12 | 보일러 배지, 방 요약 글자 |
+| Pretendard 500 | 13 | 편집 화면 힌트 |
+| Pretendard 500 | 14 | "버튼을 눌러 켜기" |
+| Pretendard 500 | 15 | "희망온도" |
+| Pretendard 400 | 17 | "현재 21.4°" |
+| Pretendard 500 | 17 | "돌려 선택 · 눌러 확인" |
+| Pretendard 500 | 18 | "설정", "방 선택" 헤더 |
+| Pretendard 500 | 20 | 방 이름(메인), 편집 화면 제목 |
+| Pretendard 400/600 | 23 | 설정 목록 항목 |
+| Pretendard 400/600 | 26 | 방 선택 목록 |
+| Inter Tight 200 | 24 / 28 | `%` / `°` 단위 |
+| Inter Tight 200 | 60 / 64 / 72 | OFF / 희망온도·화면시간 / 화면밝기 |
+
+**한글 글자 목록** (이것만 넣으면 됩니다):
+```
+거실큰방일하는노현재희망온도버튼을눌러켜기설정선택화면밝시간이전돌조절확인보분초
+```
+**ASCII:** `0123456789.°%·OFN /`
+
+> 400과 600 웨이트를 둘 다 넣기에 메모리가 부족하면 600 하나로 통일하고, 비활성 항목은 투명도로만 구분해도 됩니다.
+
+---
+
+## Screens
+
+공통: 모든 화면은 원형 240×240, 배경 `bg`입니다. 원호 각도는 **12시 = 0°, 시계방향이 +** 이고, 게이지는 −130° ~ +130°(260°)를 씁니다.
+> LVGL `lv_arc`는 3시 = 0°, 시계방향 +입니다. 변환: `lv_angle = design_angle + 270` (mod 360). 따라서 −130° → 140°, +130° → 40° (`bg_angles(140, 40)`).
+
+### 공통 요소: WiFi 상태바 (모든 화면)
+- 화면 아래에서 14px 위, 가로 중앙
+- WiFi 아이콘 14×12 (호 3개 + 점). 활성 호는 `fg` 90%, 비활성 호는 `dim` 30%
+- 텍스트 `3/3` (신호 0이면 `OFF`), JetBrains Mono 9px `dim`, 아이콘과 3px 간격
+- 디자인 확인 중 "3/3 텍스트는 필요 없다"는 의견이 나왔다가 보류됐습니다. 아이콘만 두는 쪽을 권장합니다.
+
+### 1. MAIN — 켜짐
+**원호 게이지**
+- 트랙: 반지름 100, 두께 2, `bg2`, −130°~+130°
+- 값: 반지름 100, 두께 2.5, `accent`, 끝 둥글게, −130° ~ `−130 + 260 × (target−15)/15`
+- 눈금 16개: 0..15, 각 `−130 + 260 × i/15`. 안쪽 반지름 108, 바깥 반지름 116(i%3==0, 두께 1) 또는 112(그 외, 두께 0.6)
+  - 활성(`on`이고 i/15 ≤ t): `fg` 85%. 비활성: `dim` 30%
+- 현재 온도 마커: 반지름 105→122 방사선, 두께 2.5, 끝 둥글게, `#7FC8D4` 95%. 각도 = `−130 + 260 × clamp((current−15)/15, 0, 1)`
+
+**가운데 텍스트 묶음** (세로 중앙 정렬, 위에서부터. 마스터는 묶음을 아래로 −1px 정도 이동: paddingTop 14 / paddingBottom 16)
+1. 방 이름 (`active_room`) — Pretendard 500 20px, 자간 0.13em, `dim`, 아래 여백 5
+2. `현재 21.4°  45%` — Pretendard 400 17px, 자간 0.04em, `dim`, 아래 여백 3. 온도와 습도는 한 줄(줄바꿈 금지), 간격 8px. 습도는 정수 반올림. 습도 센서 값이 없으면 습도 부분만 생략
+3. 희망온도 `22.0` — Inter Tight 200 64px, 자간 −0.04em, `fg`, 줄높이 1. 오른쪽에 `°` 28px `dim`을 **숫자 윗선에 맞춰** 붙임(간격 4)
+4. `희망온도` — Pretendard 500 15px, `accent`, 위 여백 4. **연소 중일 때만** 왼쪽에 불꽃 아이콘 14×17.5 (간격 5)
+
+### 2. MAIN — 꺼짐
+- 원호 트랙만 그림. 값 원호 없음, 눈금은 전부 비활성, 현재 온도 마커는 그림
+- 3번 대신 `OFF`: Inter Tight 200 60px, `dim`
+- 4번 대신 `버튼을 눌러 켜기`: Pretendard 500 14px, `dim`, 위 여백 6
+- 불꽃은 표시하지 않음 (`on && burning`일 때만 표시)
+
+### 3. MAIN 추가 요소 — 마스터(거실) 전용
+**보일러 배지 (상단)**
+- 위에서 26px, 가로 중앙. `[불꽃 10×12.5] 4px 보일러`
+- `보일러`: Pretendard 500 12px, 자간 0.04em
+- 하나라도 `on && burning`인 방이 있으면: 컬러 불꽃(애니메이션) + 텍스트 `#D8D6D0`
+- 아니면: `#4A4A50` 단색 불꽃(정지) + 텍스트 `#5A5A60`
+
+**방 요약 줄 (하단)**
+- 아래에서 34px, 가로 중앙, 칸 간격 5px. 칸 4개: 거 / 큰 / 일 / 노
+- 각 칸: padding (1, 4, 1, 2), 모서리 4, 테두리 1px
+  - 테두리: `active_room`이면 `#B8B8BC`, 아니면 투명 (자리는 항상 차지)
+  - 내용: `[불꽃 9×11 자리] 2px [방이름 첫 글자]`
+  - 불꽃 자리는 **항상 확보**하고 아이콘만 보이거나 숨깁니다. 그래야 글자 위치가 움직이지 않습니다. 해당 방이 `on && burning`일 때만 보이며, 단색이고 정지 상태입니다.
+  - 색: `on`이면 `#B8B8BC`, 아니면 `#4A4A50` (불꽃도 같은 색)
+  - 글자: Pretendard 500 12px
+
+### 4. SETTINGS — 목록
+- 헤더 `설정`: 위에서 36px, Pretendard 500 18px, 자간 0.18em, `dim` 75%
+- 항목: `방선택`, `화면밝기`, `화면시간`, `이전`
+- 세로 중앙(y=120)에 선택된 항목이 오는 슬롯 목록, 항목 높이 50px
+- 각 항목은 좌우 padding 30, 이름은 왼쪽, 값은 오른쪽 정렬
+  - 이름: Pretendard 23px. 활성 600 `fg`, 비활성 400
+  - 값: JetBrains Mono 17px. 활성 `accent`, 비활성 `dim`. 방선택 = 설치 방 이름, 화면밝기 = `70%`, 화면시간 = `30초`/`1분`, 이전 = 없음
+- 선택과의 거리 0 / 1 / 2+ → 크기 1.0 / 0.74 / 0.55, 투명도 1.0 / 0.45 / 0.18
+- 전환: translateY 300ms, cubic-bezier(.2,.8,.2,1). LVGL은 `lv_anim_path_ease_out`으로 근사
+
+### 5. EDIT_ROOM — 방 선택
+- 헤더 `방 선택`: 위 4번과 같은 스타일
+- 목록: 거실 / 큰방 / 일하는방 / 노는방, 가운데 정렬, 항목 높이 48
+  - Pretendard 26px. 활성 600 `accent`, 비활성 400 `fg`. 크기·투명도 규칙은 4번과 같음
+- 하단 힌트 `돌려 선택 · 눌러 확인`: 아래에서 30px, Pretendard 500 17px, `dim`
+
+### 6. EDIT_BRIGHTNESS — 화면밝기
+- 원호: 트랙(반지름 100, 두께 2, `bg2`), 값(두께 2.5, `accent`, t = (v−10)/90)
+- 가운데 묶음:
+  - `화면밝기` Pretendard 500 20px, 자간 0.12em, `dim`, 아래 여백 6
+  - 값 `70` Inter Tight 200 72px `fg` + `%` 24px `dim` (간격 3)
+  - `돌려 조절 · 눌러 확인` Pretendard 500 13px, `dim` 80%, 위 여백 10
+
+### 7. EDIT_SCREENTIME — 화면시간
+- 원호: 6번과 같음, t = idx/5
+- 눈금 6개: 반지름 106→116, 두께 1.4. i ≤ idx면 `accent`, 아니면 `dim` 40%
+- 가운데 묶음: `화면시간` (6번과 같은 스타일), 값 `30초` / `1분` 등 Inter Tight 200 64px `fg`, 힌트(6번과 같음)
+
+### 공통: 누름 플래시 오버레이
+- 동작이 일어날 때 화면 전체에 600ms 동안 표시
+- 배경: 가운데에서 퍼지는 원형 그라데이션 (색 25% → 투명, 65% 지점까지)
+- 텍스트: 52px 이탤릭 세리프, 색 = 해당 accent
+- 투명도: 0 → 1 (150ms) → 0 (450ms)
+- 내용: ON/OFF (`accent`), 설정·이전·확인·방이름 (`#CFCFCF`)
+- **LVGL:** 그라데이션 원은 성능 부담이 있으니 단색 반투명 원 또는 텍스트만 쓰는 것을 권장합니다. 세리프 이탤릭 폰트도 Pretendard 600 32px 정도로 대체해도 됩니다.
+
+---
+
+## Assets
+- **불꽃 아이콘:** `src/boiler-app.jsx`의 `FlameIcon` SVG에 있습니다 (viewBox 16×20, 바깥 경로 + 안쪽 경로).
+  - 컬러 버전: 바깥 `#E88A5E`, 안쪽 `#FFD27A`
+  - 단색 버전: 바깥 경로만, 지정한 색
+  - 필요한 크기: 14×17.5(메인), 10×12.5(배지), 9×11(방 요약)
+  - SVG를 PNG로 내보낸 뒤 LVGL 이미지 변환기로 `LV_IMG_CF_TRUE_COLOR_ALPHA` C 배열을 만드세요. 단색은 A8 형식 + `img_recolor`로 만들면 크기 하나로 색을 바꿔 쓸 수 있습니다.
+  - 애니메이션 `qa-flame`: 1.4s 반복, 아래 중심 기준 크기 변화 (1,1) → 30% (0.92,1.08) → 60% (1.05,0.94) → (1,1). LVGL에서는 `lv_img_set_zoom`으로 근사하거나, 부담되면 생략합니다.
+- **WiFi 아이콘:** SVG 호 3개. LVGL 기본 심볼 `LV_SYMBOL_WIFI`로 대체해도 됩니다.
+- 그 외 이미지는 없습니다.
+
+## Data / Integration (펌웨어 측)
+- `burning[room]`: 보일러에서 받는 방별 연소 신호. UI는 표시만 합니다.
+- `current[room]`, `humidity[room]`: 방별 온도·습도 센서 값. 시뮬레이터의 거실 외 값(온도 19.8 / 20.6 / 22.1, 습도 52 / 38 / 47)은 임시값입니다.
+- `on`, `target`: 바뀌면 보일러 쪽에 명령을 보냅니다. 인코더를 연속으로 돌리면 디바운스(~300ms) 후 한 번에 보내는 것을 권장합니다.
+- NVS에 저장: `installed_room`, `brightness`, `screen_time_s`. 방별 `on`/`target`은 보일러에서 받아오는 값이면 저장하지 않습니다.
+
+## LVGL Implementation Notes
+- 화면 하나에 컨테이너를 모드별로 나눠 두고 `LV_OBJ_FLAG_HIDDEN`으로 바꾸거나, 화면 객체 5개를 `lv_scr_load_anim`으로 전환합니다.
+- 인코더와 버튼은 LVGL indev(encoder 타입)를 쓰지 말고 **직접 이벤트를 받아 상태 머신에 넣는** 방식을 권장합니다. 짧게/길게 구분이 위 표와 정확히 일치해야 합니다.
+- 원호: `lv_arc` (노브 숨김, `LV_PART_INDICATOR` 두께 3 + 둥근 끝, 메인 트랙 두께 2)
+- 눈금·마커: `lv_line` (점은 미리 계산해 static 배열로)
+- 슬롯 목록: 항목마다 `lv_label`. 위치는 `lv_anim`으로 y를 옮기고, 크기 변화는 `transform_zoom` 스타일 또는 폰트 두 가지로 근사합니다.
+- 아래쪽 요소(방 요약, WiFi)는 원 밖으로 잘리지 않게 가로 중앙에 둡니다.
+
+## Files
+- `index.html`: 디바이스 시뮬레이터 (레이아웃 셸)
+- `src/boiler-app.jsx`: **모든 화면 컴포넌트 + 상태 머신 (기준 소스)**
+- `boiler-review.html` + `src/boiler-review.jsx`: 화면 상태 갤러리
+- `tweaks-panel.jsx`: 시뮬레이터용 조절 패널 (구현 불필요)
+- `golden.html` + `src/golden-states.jsx`: 픽셀 비교용 기준 화면 29개 (240×240)
+- `TESTING.md` + `tools/`: Chrome으로 기준 PNG 생성, 픽셀 비교, 시나리오 재생 — **구현 검증 절차는 TESTING.md를 따르세요**

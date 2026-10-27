@@ -1,0 +1,394 @@
+{
+  "_doc": "Each scenario starts from a fresh boot. Events: enc+ enc- short long room, or {\"burn\":[room,bool]}. 'expect' is a partial match against getState()/DUMP. 'snap' captures the LCD as <scenario>-<checkpoint>.png.",
+  "initial": {
+    "installedRoom": "거실",
+    "activeRoom": "거실",
+    "mode": "main",
+    "brightness": 70,
+    "screenTime": 30,
+    "rooms": {
+      "거실": {
+        "on": true,
+        "target": 22,
+        "current": 21.4,
+        "burning": true,
+        "humidity": 45
+      },
+      "큰방": {
+        "on": false,
+        "target": 22,
+        "current": 19.8,
+        "burning": false,
+        "humidity": 52
+      },
+      "일하는방": {
+        "on": false,
+        "target": 22,
+        "current": 20.6,
+        "burning": false,
+        "humidity": 38
+      },
+      "노는방": {
+        "on": false,
+        "target": 22,
+        "current": 22.1,
+        "burning": false,
+        "humidity": 47
+      }
+    }
+  },
+  "scenarios": [
+    {
+      "name": "temp-adjust",
+      "steps": [
+        {
+          "do": [
+            "enc+",
+            "enc+",
+            "enc+"
+          ],
+          "expect": {
+            "rooms": {
+              "거실": {
+                "target": 23.5
+              }
+            }
+          },
+          "snap": "up3"
+        },
+        {
+          "do": [
+            "enc-",
+            "enc-",
+            "enc-",
+            "enc-",
+            "enc-",
+            "enc-",
+            "enc-",
+            "enc-",
+            "enc-",
+            "enc-",
+            "enc-",
+            "enc-",
+            "enc-",
+            "enc-",
+            "enc-",
+            "enc-",
+            "enc-",
+            "enc-",
+            "enc-",
+            "enc-"
+          ],
+          "expect": {
+            "rooms": {
+              "거실": {
+                "target": 15
+              }
+            }
+          },
+          "snap": "clamp-min"
+        }
+      ]
+    },
+    {
+      "name": "power-toggle",
+      "steps": [
+        {
+          "do": [
+            "short"
+          ],
+          "expect": {
+            "rooms": {
+              "거실": {
+                "on": false
+              }
+            }
+          },
+          "snap": "off"
+        },
+        {
+          "do": [
+            "enc+",
+            "enc+"
+          ],
+          "expect": {
+            "rooms": {
+              "거실": {
+                "on": false,
+                "target": 22
+              }
+            }
+          }
+        },
+        {
+          "do": [
+            "short"
+          ],
+          "expect": {
+            "rooms": {
+              "거실": {
+                "on": true
+              }
+            }
+          },
+          "snap": "on"
+        }
+      ]
+    },
+    {
+      "name": "room-switch-master",
+      "steps": [
+        {
+          "do": [
+            "room"
+          ],
+          "expect": {
+            "activeRoom": "큰방"
+          },
+          "snap": "big"
+        },
+        {
+          "do": [
+            "short",
+            "enc+"
+          ],
+          "expect": {
+            "rooms": {
+              "큰방": {
+                "on": true,
+                "target": 22.5
+              },
+              "거실": {
+                "target": 22
+              }
+            }
+          },
+          "snap": "big-on"
+        },
+        {
+          "do": [
+            {
+              "burn": [
+                "큰방",
+                true
+              ]
+            }
+          ],
+          "expect": {
+            "rooms": {
+              "큰방": {
+                "burning": true
+              }
+            }
+          },
+          "snap": "big-burn"
+        },
+        {
+          "do": [
+            "room",
+            "room",
+            "room"
+          ],
+          "expect": {
+            "activeRoom": "거실"
+          },
+          "snap": "back-living"
+        }
+      ]
+    },
+    {
+      "name": "settings-brightness",
+      "steps": [
+        {
+          "do": [
+            "long"
+          ],
+          "expect": {
+            "mode": "settings",
+            "settingsSel": 0
+          },
+          "snap": "list"
+        },
+        {
+          "do": [
+            "enc+",
+            "short"
+          ],
+          "expect": {
+            "mode": "edit-brightness"
+          },
+          "snap": "edit"
+        },
+        {
+          "do": [
+            "enc+",
+            "enc+",
+            "enc+",
+            "enc+",
+            "enc+",
+            "enc+",
+            "enc+",
+            "enc+"
+          ],
+          "expect": {
+            "brightness": 100
+          },
+          "snap": "max"
+        },
+        {
+          "do": [
+            "short"
+          ],
+          "expect": {
+            "mode": "settings",
+            "settingsSel": 1
+          },
+          "snap": "back-list"
+        },
+        {
+          "do": [
+            "enc+",
+            "enc+",
+            "short"
+          ],
+          "expect": {
+            "mode": "main"
+          }
+        }
+      ]
+    },
+    {
+      "name": "settings-screentime",
+      "steps": [
+        {
+          "do": [
+            "long",
+            "enc+",
+            "enc+",
+            "short"
+          ],
+          "expect": {
+            "mode": "edit-screenTime",
+            "screenTime": 30
+          },
+          "snap": "edit"
+        },
+        {
+          "do": [
+            "enc+",
+            "enc+",
+            "enc+",
+            "enc+"
+          ],
+          "expect": {
+            "screenTime": 300
+          },
+          "snap": "max"
+        },
+        {
+          "do": [
+            "enc-",
+            "enc-",
+            "enc-",
+            "enc-",
+            "enc-",
+            "enc-",
+            "enc-"
+          ],
+          "expect": {
+            "screenTime": 10
+          },
+          "snap": "min"
+        },
+        {
+          "do": [
+            "short",
+            "enc+",
+            "short"
+          ],
+          "expect": {
+            "mode": "main"
+          }
+        }
+      ]
+    },
+    {
+      "name": "settings-room-change",
+      "steps": [
+        {
+          "do": [
+            "long",
+            "short"
+          ],
+          "expect": {
+            "mode": "edit-room",
+            "roomEditSel": "거실"
+          },
+          "snap": "edit"
+        },
+        {
+          "do": [
+            "enc+",
+            "enc+"
+          ],
+          "expect": {
+            "roomEditSel": "일하는방"
+          },
+          "snap": "work"
+        },
+        {
+          "do": [
+            "short"
+          ],
+          "expect": {
+            "mode": "settings",
+            "installedRoom": "일하는방",
+            "isMaster": false
+          }
+        },
+        {
+          "do": [
+            "enc-",
+            "short"
+          ],
+          "expect": {
+            "mode": "main",
+            "activeRoom": "일하는방"
+          },
+          "snap": "main-nonmaster"
+        },
+        {
+          "do": [
+            "room"
+          ],
+          "expect": {
+            "activeRoom": "일하는방"
+          }
+        }
+      ]
+    },
+    {
+      "name": "list-wrap",
+      "steps": [
+        {
+          "do": [
+            "long",
+            "enc-"
+          ],
+          "expect": {
+            "settingsSel": 3
+          },
+          "snap": "wrap-back"
+        },
+        {
+          "do": [
+            "enc+"
+          ],
+          "expect": {
+            "settingsSel": 0
+          }
+        }
+      ]
+    }
+  ]
+}
