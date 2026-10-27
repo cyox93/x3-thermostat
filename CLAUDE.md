@@ -23,6 +23,7 @@ Read `docs/` before changing behaviour:
 | `docs/hardware.md` | Pin map, N16R8 constraints, electrical behaviour |
 | `docs/roadmap.md` | Phases and status |
 | `docs/plc-protocol.md` | Boiler-bus PLC: waveform, messages, items, sequences, RMT implementation, what X3 must do |
+| `docs/ui.md` | LCD UI on LVGL: input mapping, brightness, structure, threading, verification (look: `design/`) |
 
 System-level design (power distribution, PLC, board fabrication, X3 modifications) is
 kept outside this repository. `docs/` carries everything the firmware needs — keep it
