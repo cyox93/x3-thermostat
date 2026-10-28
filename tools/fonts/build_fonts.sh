@@ -11,11 +11,14 @@ KO=$(tr -d '\n' < symbols.txt)
 # ASCII the Pretendard labels use: digits, '.', '°', '%', '·', '/', space, ON/OFF
 PRET_LATIN="0123456789.°%·/ ONF"
 
+PY=${IDF_PYTHON_ENV_PATH:-$HOME/.espressif/tools/python/v6.0/venv}/bin/python
+
 conv() {   # conv <font file> <size> <name> <symbols> [fallback]
   local fb=()
   [ -n "${5:-}" ] && fb=(--lv-fallback "$5")
   lv_font_conv --font "$1" --size "$2" --bpp 4 --format lvgl --no-compress \
     --symbols "$4" --lv-font-name "$3" ${fb[@]+"${fb[@]}"} -o "$OUT/$3.c"
+  "$PY" css_metrics.py "$1" "$2" "$OUT/$3.c"
   echo "  $3"
 }
 
