@@ -8,8 +8,8 @@ SRC=src
 OUT=../../components/ui/fonts
 mkdir -p "$OUT"
 KO=$(tr -d '\n' < symbols.txt)
-# ASCII the Pretendard labels use: digits, '.', '°', '%', '·', '/', space, ON/OFF
-PRET_LATIN="0123456789.°%·/ ONF"
+# ASCII the Pretendard labels use: digits, ".", "°", "%", "·", "/", "-" (below zero), space, ON/OFF
+PRET_LATIN="0123456789.°%·/- ONF"
 
 PY=${IDF_PYTHON_ENV_PATH:-$HOME/.espressif/tools/python/v6.0/venv}/bin/python
 
