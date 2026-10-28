@@ -3,6 +3,8 @@
 #include "esp_lvgl_port.h"
 #include "device.h"
 #include "ui.h"
+#include "app_state.h"
+#include "ui_priv.h"
 
 static const char *TAG = "ui";
 
@@ -34,7 +36,10 @@ esp_err_t ui_init(void)
     ESP_RETURN_ON_FALSE(disp, ESP_FAIL, TAG, "add_disp");
 
     lvgl_port_lock(0);
-    lv_obj_set_style_bg_color(lv_screen_active(), lv_color_hex(0x0E0E10), 0);
+    app_state_init();
+    ui_screens_create();
+    app_state_subscribe(ui_screens_refresh);
+    ui_screens_refresh();
     lvgl_port_unlock();
 
     ESP_LOGI(TAG, "LVGL %d.%d.%d up", LVGL_VERSION_MAJOR, LVGL_VERSION_MINOR, LVGL_VERSION_PATCH);

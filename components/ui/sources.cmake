@@ -3,6 +3,12 @@
 # file(GLOB) is evaluated at configure time: after adding a font or icon,
 # re-run cmake configure.
 set(UI_SHARED_SRCS
+    screen_main.c
+    ui_screens.c
+    ui_util.c
+    widget_flame.c
+    widget_gauge.c
+    widget_wifi.c
 )
 file(GLOB UI_FONT_SRCS "${CMAKE_CURRENT_LIST_DIR}/fonts/font_*.c")
 file(GLOB UI_ICON_SRCS "${CMAKE_CURRENT_LIST_DIR}/icons/img_*.c")
