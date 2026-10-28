@@ -45,8 +45,19 @@ MC200 stand-in, `CONFIG_SC_PLC_MC200_STANDIN`) is off by default and must stay o
 firmware for the real boiler bus; build it separately with
 `-B build-bench -D SDKCONFIG=build-bench/sdkconfig -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.bench"`.
 
-There are no tests — this is firmware that runs on hardware. Back behavioural claims
-with evidence from the bench, not with reasoning alone.
+Hardware behaviour has no automated tests — back it with evidence from the bench, not
+with reasoning alone. The UI is the exception: its pure-C state and screens also build
+on the host (`docs/ui.md` §6):
+
+```sh
+cmake -S tools/sim -B tools/sim/build -G Ninja && cmake --build tools/sim/build
+ctest --test-dir tools/sim/build          # app_state / app_input unit tests
+tools/sim/build/sim &                     # SDL2 sim; test commands on TCP 9999
+cd design/tools && node render-sim.mjs && npm run diff && npm run replay:sim
+```
+
+`npm run diff` compares the sim with the design's golden frames (`npm run serve & npm run golden`
+makes them once); `replay:sim` runs `scenarios.json`. Both must pass after UI changes.
 
 ## Architecture
 
@@ -64,6 +75,15 @@ with evidence from the bench, not with reasoning alone.
   `main.c` (init order), `main.h` (public loop APIs), `mainloop.c` (inits loops),
   `switchloop.c` (owns relays / button LEDs / keys), `sysloop.c` (owns policy, sensors,
   display brightness levels), `plcloop.c` (gathers PLC frames into groups, sends).
+- **`components/state/`** — UI state in pure C: `app_state.c` (the store, one observer),
+  `app_input.c` (the design's interaction table: input → state change + flash / events).
+- **`components/ui/`** — LVGL screens (`screen_*.c`) and widgets (`widget_*.c`, draw only).
+  Coordinates live only in `components/include/ui_geometry.h`, colours/fonts in `theme.h`.
+  `ui_router.c` is device-only (esp_lvgl_port, LCD); everything in `sources.cmake` also builds
+  in `tools/sim/`. Fonts/icons are generated (`tools/fonts/build_fonts.sh`,
+  `design/tools/build-icons.mjs`); after changing a UI string run `tools/fonts/check_glyphs.py`.
+- **`design/`** — the UI design handoff (HTML simulator, golden frames, scenarios); the look
+  is defined there, the firmware side in `docs/ui.md`.
 
 **Event-driven rule**: drivers never know about eventloops — they expose callbacks.
 Each `xxxloop.c` owns one `sc_eventloop`, a private `_xxxloop_t` state and its
@@ -72,6 +92,8 @@ Periodic work is an eventloop timer, never a polling task; a loop handler may wa
 few ms (the ALS averages over 10 ms) but never long — split longer waits into a
 trigger plus a one-shot timer, as `temp_humid` does. Loops talk to each other through the other loop's API (which posts),
 never by touching its state. See `docs/architecture.md` §3.
+The UI is the one exception: the esp_lvgl_port task is its loop thread; others hand it
+work through `ui.h`, which queues and returns (`docs/ui.md` §3.3).
 
 ### Hardware traps
 

@@ -20,6 +20,7 @@
 | PLC 수신 개선 (idle 5 ms, 1024 심볼 버퍼, 그룹 100 ms) | ✅ 실기 메시지 오류 0 |
 | main-board rev A · x3_uart_board rev A | 2026-09-15 발주, 수령 대기 |
 | x3-switch 펌웨어 AT 규격 0.1.0 | ✅ 구현 · 실측 (K4 리셋 문제 제외) |
+| UI (LVGL 9, `components/ui` · `components/state`) — 모든 화면 · 상태 머신 · 누름 플래시 | 🔶 sim에서 golden 29장 · `scenarios.json` 통과 (`docs/ui.md`), 실기 연결은 3단계 |
 
 ## Phase A — main-board bring-up
 
@@ -53,7 +54,7 @@
 코드는 있다 (`components/x3switch/`, `main/switchloop.c`). 실기 확인이 남았다.
 
 - [ ] UART1 트랜잭션 · 100 ms 타임아웃, `x3switch`로 버전 · 상태 조회
-- [ ] `+KEY` → CLICK / LONG(1 s) 판정, sysloop 로그 확인
+- [ ] `+KEY` → CLICK / LONG(3 s) 판정, sysloop 로그 확인
 - [ ] 부팅 시 `AT+STATUS?` 채택 — ESP32만 리셋해도 전등이 유지되는지
 - [ ] `+READY` 시 상태 재주입 — `x3switch reset` 후 릴레이 · LED가 돌아오는지
 - [ ] `relay` · `btn_led` · `btn_led_en` · `btn_led_bri` 콘솔 명령
@@ -65,7 +66,9 @@
 - [x] AHT25 10 s · 조도 1 s 주기 측정 — sysloop 타이머 (`sysinfo`로 확인)
 - [ ] sysloop 정책 — 목표 온도, 난방 ON/OFF, 키 → 전등 배정, 엔코더 → 목표 온도
 - [ ] 방 설정(NVS): 전등 수, 버튼 배정, 방 이름
-- [ ] `main/uiloop.c` — LVGL 도입, 현재/목표 온도 · 난방 상태 화면, 엔코더로 목표 온도 조절
+- [x] UI 1단계 — LVGL 도입 (`esp_lvgl_port`), MAIN 화면, PC 시뮬레이터 · golden 비교 (`docs/ui.md` §8)
+- [x] UI 2단계 — 설정 · 방 선택 · 밝기 · 화면시간 화면, 상태 머신 (`app_input.c`), 거실 배지 · 방 요약, 시나리오 재생
+- [ ] UI 3단계 — 실기: K1/K2 · 엔코더 → UI, 방 값 API, NVS, 화면시간 · 백라이트, `ui` · `ui test` 콘솔, `replay-serial.mjs`
 - [ ] LED Ring = 난방 동작 표시, 버튼 LED = 채널 상태
 - [ ] 목표 온도 · 모드 NVS 저장/복원
 - [x] **밝기 3단계** (NORMAL / DIM / NIGHT) — 히스테리시스 · 머무름 시간 · 밤에는 화면 끄고 만지면 10 s 켜짐

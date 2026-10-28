@@ -76,11 +76,10 @@ flowchart LR
 
 ```
 main/
-  main.c · main.h       app_main — config · console · device · x3switch · plc 초기화 → mainloop
+  main.c · main.h       app_main — config · console · device · ui · x3switch · plc 초기화 → mainloop
   mainloop.c            ✅ get_ver, 각 loop 초기화
   switchloop.c          ✅ x3-switch 보드의 소유자 — 릴레이 · 버튼 LED 상태 동기화, 키 CLICK/LONG 판정
   sysloop.c             🔶 정책의 소유자 — 키 · 엔코더 · AHT25 · 조도 (정책은 TODO)
-  uiloop.c              ⬜ 화면 (LVGL 예정)
   plcloop.c             🔶 PLC 프레임 → 그룹 · 메시지(체크섬), 송신 요청, 벤치 빌드 전용 MC200 대역(송신 검증) (조절기 역할은 TODO)
   netloop.c             ⬜ WiFi · MQTT
 components/
@@ -89,7 +88,15 @@ components/
   device/               ✅ gc9a01(LCD) · led(Ring+BL) · encoder · als(조도) · temp_humid(온습도, AHT25) · gpio_cmd
   x3switch/             ✅ x3-switch AT 클라이언트 (UART)
   plc/                  ✅ PLC 모뎀 드라이버 — RMT RX 해독 · RMT TX 오픈드레인 송신 (프레임 = 1바이트)
+  state/                🔶 UI 상태 (app_state) · 상호작용 표 (app_input) — 순수 C, 호스트 시험
+  ui/                   🔶 LVGL 화면 · 위젯, ui_router(esp_lvgl_port) — sim 검증 완료, sysloop 연결은 TODO
+tools/
+  sim/                  PC 시뮬레이터 (SDL2) + 단위 시험 — docs/ui.md §6
+  fonts/                디자인 폰트 → LVGL 변환
 ```
+
+UI는 loop가 아니라 **esp_lvgl_port의 LVGL 태스크**가 스레드를 소유한다. 다른 loop는 `ui.h`로 일을
+넘기고(큐에 넣고 바로 돌아옴) UI는 콜백으로 알린다 → [ui.md](ui.md) §3.3.
 
 ✅ = 코드 있음, 🔶 = 골격, ⬜ = 예정. 계획과 순서는 [roadmap.md](roadmap.md).
 

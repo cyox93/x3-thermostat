@@ -12,6 +12,8 @@ WiFi/MQTT로 전등 연동, 그리고 X3 안의 x3-switch 보드(별도 저장�
 | [docs/architecture.md](docs/architecture.md) | 역할 분담, 소프트웨어 구조, 이벤트 흐름, x3-switch 링크 |
 | [docs/hardware.md](docs/hardware.md) | main-board 핀맵, 모듈 제약, 신호별 전기적 동작 |
 | [docs/roadmap.md](docs/roadmap.md) | 단계별 작업과 진행 상태 |
+| [docs/plc-protocol.md](docs/plc-protocol.md) | 보일러 버스 PLC — 파형 · 메시지 · 구현 |
+| [docs/ui.md](docs/ui.md) | 원형 LCD UI (LVGL) — 입력 · 밝기 · 구조 · 검증. 모양은 [design/](design/README.md) |
 
 ## 환경
 
@@ -35,6 +37,22 @@ idf.py -p /dev/cu.usbmodem* flash monitor
 `sdkconfig`는 `sdkconfig.defaults`에서 생성된다. 설정을 바꿀 때는 `sdkconfig.defaults`를
 고치고 `sdkconfig`를 지운 뒤 다시 빌드한다 (`idf.py menuconfig`로 바꾼 것은 커밋 전에
 defaults로 옮긴다).
+
+### PC 시뮬레이터 · 화면 검증
+
+UI(`components/ui` · `components/state`)는 macOS SDL2 시뮬레이터로도 빌드된다 — 사양과 절차는 [docs/ui.md](docs/ui.md) §6.
+
+```sh
+brew install sdl2 cmake ninja            # 한 번
+cmake -S tools/sim -B tools/sim/build -G Ninja && cmake --build tools/sim/build
+ctest --test-dir tools/sim/build         # app_state · app_input 단위 시험
+tools/sim/build/sim                      # 휠 · ←/→ = 엔코더, Space = K1 (3 s 길게), Enter = 짧게, R = ROOM
+
+cd design/tools && npm i                 # 한 번
+npm run serve & npm run golden           # 디자인 기준 화면 29장
+node render-sim.mjs && npm run diff      # sim 화면 vs 기준 (3.5 %)
+npm run replay:sim                       # scenarios.json을 sim에 재생
+```
 
 ## 콘솔 명령
 
