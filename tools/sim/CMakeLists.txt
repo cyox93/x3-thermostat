@@ -28,6 +28,7 @@ add_executable(sim
     ${UI_FONT_SRCS}
     ${UI_ICON_SRCS}
     ${X3_ROOT}/components/state/app_state.c
+    ${X3_ROOT}/components/state/app_input.c
 )
 target_include_directories(sim PRIVATE . lvgl_conf stubs ${SDL2_INCLUDE_DIRS}
     ${X3_ROOT}/components/include ${UI_DIR} ${LVGL_DIR})

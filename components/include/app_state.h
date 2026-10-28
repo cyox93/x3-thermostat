@@ -86,3 +86,24 @@ void app_state_set_sel(uint8_t sel);
 void app_state_set_brightness(uint8_t pct);
 void app_state_set_screen_time(uint16_t seconds);
 void app_state_set_wifi(uint8_t level);
+
+/* ─── Interaction (app_input.c) — design/README.md "Interaction Table" ───
+   One call per input event. The state changes here; what the UI should show
+   or tell others comes back in the result, so this file never draws. */
+typedef enum {
+    APP_ACCENT_BOILER,          /* ON / OFF */
+    APP_ACCENT_SETTING,         /* 설정 · 이전 · 확인 · room names */
+} app_accent_t;
+
+typedef struct {
+    const char  *flash;         /* press-flash text, NULL = none */
+    app_accent_t accent;
+    bool heat_changed;          /* on/target of heat_room changed */
+    app_room_t heat_room;
+    bool settings_commit;       /* installed room / brightness / screen time confirmed */
+} app_result_t;
+
+app_result_t app_input_enc(int dir);    /* +1 clockwise, -1 counter-clockwise */
+app_result_t app_input_short(void);
+app_result_t app_input_long(void);
+app_result_t app_input_room(void);      /* ROOM button (K2) — ignored unless master */
