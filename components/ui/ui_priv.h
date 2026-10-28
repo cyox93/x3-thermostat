@@ -6,8 +6,9 @@
 /* ui_util.c — transparent boxes and labels without theme styling */
 lv_obj_t *ui_box(lv_obj_t *parent, lv_flex_flow_t flow);
 lv_obj_t *ui_label(lv_obj_t *parent, const lv_font_t *font, lv_color_t color, int letter_space);
-/* A label inside a box of fixed height, centred, overflow visible — what CSS
-   line-height: 1 does. Returns the label; the box is its parent. */
+/* A label inside a box of fixed height, vertically centred, overflow visible —
+   what CSS line-height: 1 does. Returns the label; the box is its parent.
+   Set its text with ui_tight_label_set_text. */
 lv_obj_t *ui_tight_label(lv_obj_t *parent, const lv_font_t *font, lv_color_t color,
                          int letter_space, int box_h);
 /* Text change for a ui_tight_label: the box takes the label's new width */
