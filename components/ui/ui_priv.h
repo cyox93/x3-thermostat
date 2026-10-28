@@ -12,6 +12,9 @@ lv_obj_t *ui_label(lv_obj_t *parent, const lv_font_t *font, lv_color_t color, in
    Set its text with ui_tight_label_set_text. */
 lv_obj_t *ui_tight_label(lv_obj_t *parent, const lv_font_t *font, lv_color_t color,
                          int letter_space, int box_h);
+/* Same with an explicit vertical nudge instead of UIG_TIGHT_DY (tuned for the big numbers) */
+lv_obj_t *ui_tight_label_dy(lv_obj_t *parent, const lv_font_t *font, lv_color_t color,
+                            int letter_space, int box_h, int dy);
 /* Text change for a ui_tight_label: the box takes the label's new width */
 void ui_tight_label_set_text(lv_obj_t *label, const char *text);
 /* "-12.5" style text from a ×10 value */
@@ -41,6 +44,12 @@ void flame_set_color(lv_obj_t *flame, lv_color_t c);     /* mono kinds only */
 /* widget_wifi.c */
 lv_obj_t *wifi_create(lv_obj_t *parent);
 void wifi_set_level(lv_obj_t *wifi, uint8_t level);
+
+/* widget_boiler_badge.c / widget_room_summary.c — master-only parts of MAIN */
+lv_obj_t *badge_create(lv_obj_t *parent);
+void badge_set(lv_obj_t *badge, bool burning);
+lv_obj_t *summary_create(lv_obj_t *parent);
+void summary_set(lv_obj_t *summary, const app_state_t *st);
 
 /* screen_main.c */
 lv_obj_t *screen_main_create(void);

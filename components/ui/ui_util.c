@@ -30,6 +30,12 @@ lv_obj_t *ui_label(lv_obj_t *parent, const lv_font_t *font, lv_color_t color, in
 lv_obj_t *ui_tight_label(lv_obj_t *parent, const lv_font_t *font, lv_color_t color,
                          int letter_space, int box_h)
 {
+    return ui_tight_label_dy(parent, font, color, letter_space, box_h, UIG_TIGHT_DY);
+}
+
+lv_obj_t *ui_tight_label_dy(lv_obj_t *parent, const lv_font_t *font, lv_color_t color,
+                            int letter_space, int box_h, int dy)
+{
     lv_obj_t *box = lv_obj_create(parent);
     lv_obj_remove_style_all(box);
     lv_obj_set_height(box, box_h);
@@ -38,7 +44,7 @@ lv_obj_t *ui_tight_label(lv_obj_t *parent, const lv_font_t *font, lv_color_t col
     lv_obj_set_clickable(box, false);
     lv_obj_t *l = ui_label(box, font, color, letter_space);
     lv_obj_set_style_pad_right(l, 0, 0);
-    lv_obj_align(l, LV_ALIGN_LEFT_MID, 0, UIG_TIGHT_DY);
+    lv_obj_align(l, LV_ALIGN_LEFT_MID, 0, dy);
     return l;
 }
 

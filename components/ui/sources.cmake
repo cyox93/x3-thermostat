@@ -8,9 +8,11 @@ set(UI_SHARED_SRCS
     ui_screens.c
     ui_test.c
     ui_util.c
+    widget_boiler_badge.c
     widget_flame.c
     widget_flash.c
     widget_gauge.c
+    widget_room_summary.c
     widget_wifi.c
 )
 file(GLOB UI_FONT_SRCS "${CMAKE_CURRENT_LIST_DIR}/fonts/font_*.c")

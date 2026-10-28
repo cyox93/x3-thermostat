@@ -62,3 +62,21 @@
 #define UIG_FLASH_IN_MS       150
 #define UIG_FLASH_R           110     /* 65 % of the gradient's farthest-corner radius */
 #define UIG_FLASH_DISC_OPA_PCT 10     /* mean of the 25 % → 0 falloff over the disc */
+
+/* Master (거실) extras on MAIN */
+#define UIG_MASTER_STACK_PT   14      /* the centre stack moves down to make room */
+#define UIG_MASTER_STACK_PB   16
+#define UIG_BADGE_TOP         27      /* design 26; measured 1 px high */
+#define UIG_BADGE_GAP         4
+#define UIG_SUMMARY_BOTTOM    34
+#define UIG_SUMMARY_GAP       5       /* between cells */
+#define UIG_SUMMARY_PAD_T     1
+#define UIG_SUMMARY_PAD_R     4
+#define UIG_SUMMARY_PAD_B     1
+#define UIG_SUMMARY_PAD_L     2
+#define UIG_SUMMARY_RADIUS    4
+#define UIG_SUMMARY_FLAME_W   9       /* slot always kept so letters never move */
+#define UIG_SUMMARY_FLAME_H   12
+#define UIG_SUMMARY_INNER_GAP 2
+#define UIG_SUMMARY_TEXT_H    13      /* line-height 1.1 × 12 */
+#define UIG_SUMMARY_TEXT_DY   1       /* measured: letters sat 1.5 px high */

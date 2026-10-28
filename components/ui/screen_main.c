@@ -11,6 +11,7 @@ static struct {
     lv_obj_t *on_box, *hero, *flame;
     lv_obj_t *off_box;
     lv_obj_t *wifi;
+    lv_obj_t *stack, *badge, *summary;
 } s;
 
 static int target_t_pm(int x10)
@@ -37,6 +38,7 @@ lv_obj_t *screen_main_create(void)
     /* Centre stack: a full-screen column centred both ways, like the design's flex box */
     lv_obj_t *stack = ui_box(s.scr, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_size(stack, UIG_W, UIG_H);
+    s.stack = stack;
 
     s.room = ui_label(stack, &font_pret500_20, TH_DIM, UIG_MAIN_ROOM_LS);
     lv_obj_set_style_pad_bottom(s.room, UIG_MAIN_ROOM_MB, 0);
@@ -74,6 +76,8 @@ lv_obj_t *screen_main_create(void)
     lv_obj_set_style_pad_top(hint, UIG_MAIN_HINT_MT, 0);
     lv_label_set_text(hint, "버튼을 눌러 켜기");
 
+    s.badge = badge_create(s.scr);
+    s.summary = summary_create(s.scr);
     s.wifi = wifi_create(s.scr);
     return s.scr;
 }
@@ -110,4 +114,19 @@ void screen_main_refresh(void)
     gauge_set_value(s.gauge, r->on, target_t_pm(r->target_x10));
     gauge_set_marker(s.gauge, has_cur, has_cur ? target_t_pm(r->current_x10) : 0);
     wifi_set_level(s.wifi, st->wifi_level);
+
+    /* Master only: the boiler badge and the four-room summary */
+    bool master = app_state_is_master();
+    bool any_burning = false;
+    for (int i = 0; i < APP_ROOM_COUNT; i++) {
+        any_burning |= st->rooms[i].on && st->rooms[i].burning;
+    }
+    lv_obj_set_style_pad_top(s.stack, master ? UIG_MASTER_STACK_PT : 0, 0);
+    lv_obj_set_style_pad_bottom(s.stack, master ? UIG_MASTER_STACK_PB : 0, 0);
+    ui_show(s.badge, master);
+    ui_show(s.summary, master);
+    if (master) {
+        badge_set(s.badge, any_burning);
+        summary_set(s.summary, st);
+    }
 }
