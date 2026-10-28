@@ -60,10 +60,11 @@ LCD 백라이트는 디자인대로 사용자가 정하고, UI(`ui_router`)가 �
 ```
 components/
   state/app_state.c     UI 상태의 유일한 원본 — 순수 C, ESP-IDF 의존 없음
+  state/app_input.c     상호작용 표(design/README.md) — 입력 하나 → 상태 변경 + 결과(플래시 · 알림)
   settings/settings.c   NVS에 남길 값 (core/config) — device 전용, sim은 stub
   ui/
     sources.cmake       ESP 빌드와 sim이 함께 쓰는 소스 목록
-    ui_input.c          입력 → app_state 디스패치, 플래시 판단            ┐ sim과 공유
+    ui_input.c          입력 → app_input → 누름 플래시                    ┐ sim과 공유
     ui_test.c           시험 명령 해석 · 실행 (RESET · 상태 명령 · DUMP …)  │ (sources.cmake)
     ui_util.c           라벨 · 상자 만들기 도우미                           │
     ui_screens.c        모드 → 화면 고르기, 모든 refresh 호출               │
@@ -243,15 +244,17 @@ UI가 소유한 출력은 UI의 명령으로만 바꾼다 (`architecture.md` §3
 
 같은 `components/ui`(router 제외) · `components/state` 소스를 macOS SDL2로 빌드한다
 (`brew install sdl2 cmake ninja`). LVGL 소스는 `managed_components/lvgl__lvgl`을 쓰므로 ESP 빌드를
-한 번 먼저 해야 한다. `stubs/`에 `ui_router`(observer · 플래시 표시) · `settings`(메모리) 대역을 둔다.
+한 번 먼저 해야 한다. `ui_router.c` 대신 `tools/sim/main.c`가 observer를 걸고 입력을 넣는다.
 **화면시간 · 깨우기 · 백라이트는 sim에서 검증되지 않는다.** 색 깊이는 실기와 같은 RGB565
-(`LV_COLOR_DEPTH 16`)로 둬서 SNAP을 그대로 비교할 수 있게 한다.
+(`LV_COLOR_FORMAT_DEFAULT` RGB565)로 둬서 SNAP을 그대로 비교할 수 있게 한다. 창에는 원 바깥을 가리는
+마스크가 있지만 `lv_layer_sys`에 있어 SNAP에는 들어가지 않는다.
 
 | sim 입력 | 뜻 |
 |---|---|
-| 마우스 휠 | 인코더 ± |
-| Space | PUSH — 1 s 미만에 떼면 짧게, 1 s가 지나면 길게 |
-| R | ROOM |
+| 마우스 휠 · ←/→ | 인코더 ± |
+| Space | K1 — 1 s 미만에 떼면 짧게, 1 s가 지나면 길게 (누른 채 발생) |
+| Enter | K1 짧게 |
+| R | K2 = ROOM |
 | TCP 9999 | 아래 시험 명령 (한 연결 = 한 명령 = 한 응답) |
 
 ### 6.2 시험 명령
@@ -316,11 +319,20 @@ UI가 소유한 출력은 UI의 명령으로만 바꾼다 (`architecture.md` §3
 
 1. `npm run golden` → `golden/*.png` 29장 + `golden/states.json`
 2. `render-sim.mjs`: sim에 항목마다 `ANIM 0` · `RESET` · 상태 명령 · `SNAP` → `out/lvgl/<id>.png` → `npm run diff`
-   (원 안쪽 2% 초과면 FAIL)
-3. `scenarios.json`을 HTML(`npm run replay`) · sim(`replay-sim.mjs`) · 실기(`replay-serial.mjs`)에 재생해
-   `DUMP`를 `expect`와 비교하고, 화면은 `compare.mjs`로 HTML 결과와 비교한다
+   (원 안쪽 3.5% 초과면 FAIL — 아래)
+3. `scenarios.json`을 HTML(`npm run replay`) · sim(`npm run replay:sim`) · 실기(`replay-serial.mjs`)에 재생해
+   `DUMP`를 `expect`와 비교하고, 화면은 HTML 결과와 비교한다 (`npm run diff:replay`)
 
 판단 기준은 "위치 · 크기 · 색이 맞는가"다. 글자 테두리만 빨가면 정상, 덩어리로 빨가면 틀렸다.
+
+**한도 3.5%의 근거 (2026-10-28, sim).** 29장 중 16장은 2% 아래, 13장(편집 화면 · 마스터 MAIN ·
+방 선택 1장)이 2.1~3.11%였다. 13장 모두 요소 위치는 1~3 px 안이고 빨간 곳은 글자 획을 따라서만 나온다 —
+Chrome이 Inter Tight 200 · Pretendard 획을 더 굵게 그린다. 글리프 알파에 감마(0.75 · 0.6)를 줘도 13장이
+그대로 2%를 넘어 농도가 아니라 획 폭 차이로 본다. 한도를 넘는 프레임이 생기면 diff 이미지부터 본다.
+
+**맞추면서 알게 된 것.** `lv_font_conv`는 변환한 글리프로만 줄 높이를 잡아 CSS `line-height: normal`보다
+낮다 → `tools/fonts/css_metrics.py`가 hhea 값으로 고쳐 쓴다. CSS `letter-spacing`은 마지막 글자 뒤에도
+붙는다 → 양수 자간 라벨은 오른쪽 패딩으로 그 칸을 둔다. 그 밖의 1 px 보정은 `ui_geometry.h`에 이유와 함께 있다.
 `design/tools/golden/` · `out/` · `node_modules/`는 `.gitignore`에 넣는다.
 
 ### 6.5 실기에서만 보는 것
@@ -348,5 +360,5 @@ UI가 소유한 출력은 UI의 명령으로만 바꾼다 (`architecture.md` §3
 | 단계 | 내용 | 끝난 기준 |
 |---|---|---|
 | 1 | LVGL · 포트 · theme · 폰트 · `ui_geometry.h`, MAIN 화면, sim + TCP 시험 명령 (`RESET` · 상태 명령 · `ANIM` · `SNAP`) · `render-sim.mjs` | MAIN 계열 golden PASS (sim), 실기에 MAIN 표시 |
-| 2 | SETTINGS · EDIT 화면, 플래시, 마스터 요소, `ui_input.c` 상태 머신 전부 | golden 29장 PASS (sim) |
-| 3 | 나머지 시험 명령 · 실기 `ui test` · `ui` 콘솔 명령, `replay-sim.mjs` · `replay-serial.mjs`, sysloop 연결, NVS, §7 정리 | `scenarios.json` sim · 실기 통과, §6.5 실기 확인 |
+| 2 | SETTINGS · EDIT 화면, 플래시, 마스터 요소, `app_input.c` 상태 머신 전부, 나머지 시험 명령 · `DUMP` · `replay-sim.mjs` | golden 29장 PASS, `scenarios.json` sim 통과 |
+| 3 | 실기 `ui test` · `ui` 콘솔 명령, `replay-serial.mjs`, sysloop 연결, NVS, 화면시간 · 백라이트, §7 정리 | `scenarios.json` 실기 통과, §6.5 실기 확인 |

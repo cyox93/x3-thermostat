@@ -9,7 +9,8 @@
     "diff": "node compare.mjs golden out/lvgl out/diff --max 3.5",
     "sim": "node render-sim.mjs",
     "diff:present": "node compare.mjs golden out/lvgl out/diff --max 3.5 --present-only",
-    "replay:sim": "node replay-sim.mjs scenarios.json out/sim-replay"
+    "replay:sim": "node replay-sim.mjs scenarios.json out/sim-replay",
+    "diff:replay": "node compare.mjs out/html out/sim-replay out/diff-replay --max 3.5"
   },
   "dependencies": {
     "pixelmatch": "^6.0.0",
