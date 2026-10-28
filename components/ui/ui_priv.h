@@ -45,15 +45,28 @@ void flame_set_color(lv_obj_t *flame, lv_color_t c);     /* mono kinds only */
 lv_obj_t *wifi_create(lv_obj_t *parent);
 void wifi_set_level(lv_obj_t *wifi, uint8_t level);
 
+/* widget_focus_list.c — the design's focus-centred lists + the list header */
+typedef struct focus_list focus_list_t;
+focus_list_t *focus_list_create(lv_obj_t *parent, int count, int item_h);
+lv_obj_t *focus_list_row(focus_list_t *l, int i);
+void focus_list_select(focus_list_t *l, int sel, bool animate);
+void focus_list_reset(focus_list_t *l);
+lv_obj_t *header_create(lv_obj_t *parent, const char *text);
+
 /* widget_boiler_badge.c / widget_room_summary.c — master-only parts of MAIN */
 lv_obj_t *badge_create(lv_obj_t *parent);
 void badge_set(lv_obj_t *badge, bool burning);
 lv_obj_t *summary_create(lv_obj_t *parent);
 void summary_set(lv_obj_t *summary, const app_state_t *st);
 
-/* screen_main.c */
+/* Screens: create once, refresh draws app_state (no-op unless active) */
+lv_obj_t *ui_screen_create(void);
 lv_obj_t *screen_main_create(void);
 void screen_main_refresh(void);
+lv_obj_t *screen_settings_create(void);
+void screen_settings_refresh(void);
+lv_obj_t *screen_edit_room_create(void);
+void screen_edit_room_refresh(void);
 
 /* ui_screens.c — create all screens, load the one for the mode, refresh all */
 void ui_screens_create(void);

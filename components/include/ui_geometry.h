@@ -80,3 +80,19 @@
 #define UIG_SUMMARY_INNER_GAP 2
 #define UIG_SUMMARY_TEXT_H    13      /* line-height 1.1 × 12 */
 #define UIG_SUMMARY_TEXT_DY   1       /* measured: letters sat 1.5 px high */
+
+/* Focus lists (ScreenSettings / ScreenRoomEdit): row top = centre − itemH/2 + itemH·(i − sel) */
+#define UIG_LIST_SCALE_1      189     /* 0.74 × 256 */
+#define UIG_LIST_SCALE_2      141     /* 0.55 × 256 */
+#define UIG_LIST_OPA_1_PCT    45
+#define UIG_LIST_OPA_2_PCT    18
+#define UIG_LIST_ANIM_MS      300
+#define UIG_HEADER_TOP        36      /* "설정" / "방 선택" */
+#define UIG_HEADER_LS         3       /* 0.18em × 18 */
+#define UIG_HEADER_OPA_PCT    75
+
+#define UIG_SET_ITEM_H        50
+#define UIG_SET_PAD_X         30
+#define UIG_ROOM_ITEM_H       48
+#define UIG_ROOM_HINT_BOTTOM  30
+#define UIG_ROOM_HINT_LS      0       /* 0.04em × 17 = 0.68; 1 made the line 6 px too wide */

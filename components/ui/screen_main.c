@@ -21,10 +21,7 @@ static int target_t_pm(int x10)
 
 lv_obj_t *screen_main_create(void)
 {
-    s.scr = lv_obj_create(NULL);
-    lv_obj_set_scrollable(s.scr, false);
-    lv_obj_set_style_bg_color(s.scr, TH_BG, 0);
-    lv_obj_set_style_bg_opa(s.scr, LV_OPA_COVER, 0);
+    s.scr = ui_screen_create();
 
     const gauge_cfg_t gcfg = {
         .tick_count = UIG_TICK_COUNT, .tick_major_every = UIG_TICK_MAJOR_EVERY,

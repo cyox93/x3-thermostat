@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "ui_priv.h"
 #include "ui_geometry.h"
+#include "theme.h"
 
 lv_obj_t *ui_box(lv_obj_t *parent, lv_flex_flow_t flow)
 {
@@ -59,6 +60,15 @@ void ui_tight_label_set_text(lv_obj_t *label, const char *text)
     lv_text_get_size(&sz, text, lv_obj_get_style_text_font(label, 0),
                      lv_obj_get_style_text_letter_space(label, 0), 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
     lv_obj_set_width(box, sz.x + lv_obj_get_style_text_letter_space(label, 0));
+}
+
+lv_obj_t *ui_screen_create(void)
+{
+    lv_obj_t *scr = lv_obj_create(NULL);
+    lv_obj_set_scrollable(scr, false);
+    lv_obj_set_style_bg_color(scr, TH_BG, 0);
+    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
+    return scr;
 }
 
 void ui_fmt_x10(char *buf, size_t len, int v_x10)

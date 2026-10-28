@@ -31,11 +31,18 @@ const ok = async (cmd) => { const r = await send(cmd); if (r !== 'OK') throw new
 function commands(g) {
   const room = (name, on, target, burning, noHum) =>
     `ROOM ${name} ${on ? 1 : 0} ${x10(target)} ${x10(TEMPS[name])} ${noHum ? '-' : HUMS[name]} ${burning ? 1 : 0}`;
+  const wifi = `WIFI ${g.wifi ?? 3}`;
+  if (g.kind === 'settings') {
+    const st = g.settings;
+    return [`INSTALL ${st.roomName}`, `ACTIVE ${st.roomName}`, `BRIGHT ${st.brightness}`,
+            `STIME ${st.screenTime}`, wifi, 'MODE settings', `SEL ${g.sel}`];
+  }
+  if (g.kind === 'room') return [wifi, 'MODE edit-room', `SEL ${g.sel}`];
   if (g.kind !== 'main') return null;
   const c = [`INSTALL ${g.summary ? '거실' : g.room}`, `ACTIVE ${g.room}`];
   if (g.summary) for (const r of g.summary) c.push(room(r.name, r.on, 22, r.burning, false));
   c.push(room(g.room, g.on, g.target, g.burning, g.noHum));
-  c.push(`WIFI ${g.wifi ?? 3}`, 'MODE main');
+  c.push(wifi, 'MODE main');
   return c;
 }
 

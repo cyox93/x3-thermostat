@@ -3,7 +3,9 @@
 # file(GLOB) is evaluated at configure time: after adding a font or icon,
 # re-run cmake configure.
 set(UI_SHARED_SRCS
+    screen_edit_room.c
     screen_main.c
+    screen_settings.c
     ui_input.c
     ui_screens.c
     ui_test.c
@@ -11,6 +13,7 @@ set(UI_SHARED_SRCS
     widget_boiler_badge.c
     widget_flame.c
     widget_flash.c
+    widget_focus_list.c
     widget_gauge.c
     widget_room_summary.c
     widget_wifi.c
