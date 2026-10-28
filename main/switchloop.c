@@ -28,7 +28,7 @@ static const int SWITCHLOOP_RETRY_TIMER_ID = 1;
 #define SWITCHLOOP_KEY_TIMER_ID     10
 
 #define _RETRY_MS           2000
-#define _LONG_PRESS_MS      1000
+#define _LONG_PRESS_MS      3000    /* long = settings on the UI; short holds must not reach it */
 
 #define _CH_NUM             SC_X3SWITCH_CH_NUM
 

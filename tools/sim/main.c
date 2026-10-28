@@ -2,7 +2,7 @@
    test commands on TCP 9999. Everything runs in this one thread, like the
    device's LVGL task.
      wheel, ←/→   encoder (one notch = one detent)
-     Space        K1: release before 1 s = short, hold 1 s = long (fires while held)
+     Space        K1: release before 3 s = short, hold 3 s = long (fires while held)
      Enter        K1 short
      R            K2 = ROOM (master only)
      Esc          quit */
@@ -13,7 +13,7 @@
 #include "ui_priv.h"
 #include "sim_remote.h"
 
-#define LONG_PRESS_MS 1000      /* switchloop's long-press time (docs/ui.md §2.1) */
+#define LONG_PRESS_MS 3000      /* switchloop's long-press time (docs/ui.md §2.1) */
 
 static volatile sig_atomic_t s_quit;
 static uint32_t s_space_down;       /* 0 = not held */
