@@ -113,3 +113,6 @@
 #define UIG_TIME_TICK_R_IN    106
 #define UIG_TIME_TICK_R_OUT   116
 #define UIG_TIME_TICK_W       1       /* design 1.4 */
+
+/* Badge flame flicker (qa-flame): scale keyframes ×256 at 0 / 30 / 60 / 100 % of the period */
+#define UIG_FLAME_ANIM_MS     1400
