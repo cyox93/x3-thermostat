@@ -30,3 +30,20 @@ CONFIG_LOG_DEFAULT_LEVEL_INFO=y
 
 # LCD buffer in DMA-capable memory
 CONFIG_SPI_MASTER_ISR_IN_IRAM=y
+
+# PSRAM: keep code and rodata in flash. LVGL style reads from PSRAM-placed
+# rodata crash with LoadProhibited (lvgl#3742, esp-bsp#443).
+# CONFIG_SPIRAM_XIP_FROM_PSRAM is not set
+# CONFIG_SPIRAM_FETCH_INSTRUCTIONS is not set
+# CONFIG_SPIRAM_RODATA is not set
+
+# LVGL 9.5 — RGB565; byte swap is the runtime swap_bytes flag in ui_router.c
+CONFIG_LV_COLOR_DEPTH_16=y
+CONFIG_LV_USE_CLIB_MALLOC=y
+CONFIG_LV_USE_ASSERT_STYLE=y
+CONFIG_LV_USE_LOG=y
+CONFIG_LV_LOG_LEVEL_WARN=y
+CONFIG_LV_USE_SNAPSHOT=y
+CONFIG_LV_USE_PERF_MONITOR=n
+CONFIG_LV_BUILD_EXAMPLES=n
+CONFIG_LV_USE_DEMO_WIDGETS=n

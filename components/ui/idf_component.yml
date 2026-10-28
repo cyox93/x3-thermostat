@@ -1,0 +1,11 @@
+## IDF Component Manager Manifest File
+dependencies:
+  idf:
+    version: '>=5.0'
+  lvgl/lvgl: "^9.5.0"
+  espressif/esp_lvgl_port: "^2.7.0"
+  # esp_lvgl_port.h pulls in its knob and button headers, which #error
+  # without these. We don't use them: input goes straight to the UI state
+  # machine (docs/ui.md §5).
+  espressif/knob: "^1.0.0"
+  espressif/button: "^4.0.0"
