@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "esp_err.h"
+#include "esp_lcd_types.h"
 
 #define SC_LED_OFF   (-1)
 #define SC_LED_RED   0
@@ -10,6 +11,8 @@
 esp_err_t sc_device_init(void);
 
 esp_err_t sc_lcd_init(void);
+/* For the UI's LVGL display port. Valid after sc_lcd_init(). */
+esp_err_t sc_lcd_get_handles(esp_lcd_panel_io_handle_t *io, esp_lcd_panel_handle_t *panel);
 
 esp_err_t sc_led_init(void);
 esp_err_t sc_led_on(bool on);

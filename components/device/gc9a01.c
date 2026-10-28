@@ -182,20 +182,11 @@ static esp_err_t gc9a01_panel_draw_bitmap(esp_lcd_panel_t *panel, int x_start, i
         ((y_end - 1) >> 8) & 0xFF, (y_end - 1) & 0xFF,
     }, 4), TAG, "RASET failed");
 
-    // GC9A01 expects big-endian RGB565 — swap bytes on little-endian ESP32
-    size_t pixel_count = (x_end - x_start) * (y_end - y_start);
-    size_t len = pixel_count * 2;
-    uint16_t *swapped = heap_caps_malloc(len, MALLOC_CAP_DMA);
-    if (swapped) {
-        const uint16_t *src = color_data;
-        for (size_t i = 0; i < pixel_count; i++) {
-            swapped[i] = __builtin_bswap16(src[i]);
-        }
-        esp_lcd_panel_io_tx_color(io, LCD_CMD_RAMWR, swapped, len);
-        free(swapped);
-    } else {
-        esp_lcd_panel_io_tx_color(io, LCD_CMD_RAMWR, color_data, len);
-    }
+    // Callers hand in big-endian RGB565 (LVGL swaps with swap_bytes). The
+    // transfer is asynchronous: color_data must stay valid until the panel
+    // IO's color-done callback, which is what LVGL's flush_ready waits for.
+    size_t len = (x_end - x_start) * (y_end - y_start) * 2;
+    esp_lcd_panel_io_tx_color(io, LCD_CMD_RAMWR, color_data, len);
 
     return ESP_OK;
 }
@@ -293,12 +284,17 @@ esp_err_t gc9a01_fill_color(gc9a01_handle_t *handle, uint16_t color)
     uint16_t *buf = heap_caps_malloc(GC9A01_LCD_WIDTH * sizeof(uint16_t), MALLOC_CAP_DMA);
     if (!buf) return ESP_ERR_NO_MEM;
 
+    // The panel takes big-endian pixels; draw_bitmap no longer swaps.
+    uint16_t be = __builtin_bswap16(color);
     for (int i = 0; i < GC9A01_LCD_WIDTH; i++) {
-        buf[i] = color;
+        buf[i] = be;
     }
+    // Every row reuses buf — fine, the content never changes while queued.
     for (int y = 0; y < GC9A01_LCD_HEIGHT; y++) {
         esp_lcd_panel_draw_bitmap(handle->panel, 0, y, GC9A01_LCD_WIDTH, y + 1, buf);
     }
+    // A parameter transfer waits for queued color transfers, so buf is idle after it.
+    esp_lcd_panel_io_tx_param(handle->io, LCD_CMD_NOP, NULL, 0);
 
     free(buf);
     return ESP_OK;
@@ -426,13 +422,21 @@ esp_err_t sc_lcd_init(void)
     lcd_color_args.b = arg_int1(NULL, NULL, "<b>", "0-255");
     lcd_color_args.end = arg_end(3);
     ESP_ERROR_CHECK(esp_console_cmd_register(&(esp_console_cmd_t){
-        .command = "lcd_color", .help = "Fill LCD with RGB color",
+        .command = "lcd_color", .help = "Fill LCD with RGB color (bring-up; LVGL redraws over it)",
         .func = &cmd_lcd_color, .argtable = &lcd_color_args,
     }));
     ESP_ERROR_CHECK(esp_console_cmd_register(&(esp_console_cmd_t){
-        .command = "lcd_id", .help = "Read panel ID/status over SDA (bit-banged 3-wire read)",
+        .command = "lcd_id", .help = "Read panel ID/status over SDA (bring-up; bit-banged 3-wire read)",
         .func = &cmd_lcd_id,
     }));
 
+    return ESP_OK;
+}
+
+esp_err_t sc_lcd_get_handles(esp_lcd_panel_io_handle_t *io, esp_lcd_panel_handle_t *panel)
+{
+    if (!s_lcd.panel) return ESP_ERR_INVALID_STATE;
+    *io = s_lcd.io;
+    *panel = s_lcd.panel;
     return ESP_OK;
 }
