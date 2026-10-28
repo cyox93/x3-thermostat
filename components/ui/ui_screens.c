@@ -6,6 +6,7 @@ static bool s_anim = true;
 void ui_screens_create(void)
 {
     s_screens[APP_MODE_MAIN] = screen_main_create();
+    flash_init();
     /* Stage 2 adds SETTINGS / EDIT_* screens; until then they fall back to MAIN */
 }
 

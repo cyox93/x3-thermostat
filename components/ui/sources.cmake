@@ -4,10 +4,12 @@
 # re-run cmake configure.
 set(UI_SHARED_SRCS
     screen_main.c
+    ui_input.c
     ui_screens.c
     ui_test.c
     ui_util.c
     widget_flame.c
+    widget_flash.c
     widget_gauge.c
     widget_wifi.c
 )

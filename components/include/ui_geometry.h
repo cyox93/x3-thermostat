@@ -56,3 +56,9 @@
 #define UIG_WIFI_BOTTOM       14
 #define UIG_WIFI_TEXT_GAP     3
 #define UIG_WIFI_LS           1       /* 0.08em × 9 */
+
+/* Press flash (PressOverlay) */
+#define UIG_FLASH_MS          600
+#define UIG_FLASH_IN_MS       150
+#define UIG_FLASH_R           110     /* 65 % of the gradient's farthest-corner radius */
+#define UIG_FLASH_DISC_OPA_PCT 10     /* mean of the 25 % → 0 falloff over the disc */

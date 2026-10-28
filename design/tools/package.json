@@ -8,7 +8,8 @@
     "replay": "node replay-html.mjs http://localhost:8080/index.html scenarios.json out/html",
     "diff": "node compare.mjs golden out/lvgl out/diff",
     "sim": "node render-sim.mjs",
-    "diff:present": "node compare.mjs golden out/lvgl out/diff --present-only"
+    "diff:present": "node compare.mjs golden out/lvgl out/diff --present-only",
+    "replay:sim": "node replay-sim.mjs scenarios.json out/sim-replay"
   },
   "dependencies": {
     "pixelmatch": "^6.0.0",

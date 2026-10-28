@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include "lvgl.h"
 #include "app_state.h"
+#include "ui.h"
 
 /* ui_util.c — transparent boxes and labels without theme styling */
 lv_obj_t *ui_box(lv_obj_t *parent, lv_flex_flow_t flow);
@@ -50,6 +51,14 @@ void ui_screens_create(void);
 void ui_screens_refresh(void);
 void ui_screens_set_anim(bool on);
 bool ui_screens_anim(void);
+
+/* ui_input.c — one input through the state machine, then the press flash.
+   UI thread only; the device and the sim feed it the same way. */
+void ui_input_apply(ui_input_t in);
+
+/* widget_flash.c — the press flash on lv_layer_top */
+void flash_init(void);
+void flash_show(const char *text, lv_color_t accent);
 
 /* ui_test.c — docs/ui.md §6.2. out() receives the reply in pieces
    (SNAP is ~150 KB); the reply ends with "\n". */

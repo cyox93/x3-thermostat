@@ -60,6 +60,34 @@ static void snap(ui_test_out_t out, void *arg)
     lv_draw_buf_destroy(db);
 }
 
+/* Same keys and units as the HTML simulator's getState() (design/TESTING.md) */
+static void dump(ui_test_out_t out, void *arg)
+{
+    const app_state_t *st = app_state_get();
+    char buf[1024];
+    char t[3][12];
+    int n = snprintf(buf, sizeof(buf),
+        "{\"mode\":\"%s\",\"installedRoom\":\"%s\",\"activeRoom\":\"%s\",\"isMaster\":%s,"
+        "\"settingsSel\":%d,\"roomEditSel\":\"%s\",\"brightness\":%d,\"screenTime\":%d,\"rooms\":{",
+        app_mode_name(st->mode), app_room_name(st->installed_room), app_room_name(st->active_room),
+        app_state_is_master() ? "true" : "false", st->settings_sel, app_room_name(st->room_edit_sel),
+        st->brightness, st->screen_time_s);
+    for (int i = 0; i < APP_ROOM_COUNT && n < (int)sizeof(buf); i++) {
+        const app_room_state_t *r = &st->rooms[i];
+        ui_fmt_x10(t[0], sizeof(t[0]), r->target_x10);
+        if (r->current_x10 == APP_TEMP_NONE) snprintf(t[1], sizeof(t[1]), "null");
+        else ui_fmt_x10(t[1], sizeof(t[1]), r->current_x10);
+        if (r->humidity == APP_HUM_NONE) snprintf(t[2], sizeof(t[2]), "null");
+        else snprintf(t[2], sizeof(t[2]), "%d", r->humidity);
+        n += snprintf(buf + n, sizeof(buf) - n,
+            "%s\"%s\":{\"on\":%s,\"target\":%s,\"current\":%s,\"humidity\":%s,\"burning\":%s}",
+            i ? "," : "", app_room_name(i), r->on ? "true" : "false", t[0], t[1], t[2],
+            r->burning ? "true" : "false");
+    }
+    if (n < (int)sizeof(buf)) snprintf(buf + n, sizeof(buf) - n, "}}\n");
+    reply(out, arg, buf);
+}
+
 static int none_or_int(const char *s, int none)
 {
     return strcmp(s, "-") == 0 ? none : atoi(s);
@@ -86,7 +114,7 @@ void ui_test_exec(const char *line, ui_test_out_t out, void *arg)
     } else if (!strcmp(cmd, "ACTIVE") && argc == 2 && room >= 0) {
         app_state_set_active(room);
     } else if (!strcmp(cmd, "ROOM") && argc == 7 && room >= 0) {
-        /* ROOM with arguments sets a room; bare ROOM (the button) comes in stage 2 */
+        /* ROOM with arguments sets a room; bare ROOM is the button */
         app_room_state_t rs = {
             .on = atoi(argv[2]) != 0,
             .target_x10 = atoi(argv[3]),
@@ -95,6 +123,29 @@ void ui_test_exec(const char *line, ui_test_out_t out, void *arg)
             .burning = atoi(argv[6]) != 0,
         };
         app_state_set_room(room, &rs);
+    } else if (!strcmp(cmd, "ENC+") && argc == 1) {
+        ui_input_apply(UI_IN_ENC_CW);
+    } else if (!strcmp(cmd, "ENC-") && argc == 1) {
+        ui_input_apply(UI_IN_ENC_CCW);
+    } else if (!strcmp(cmd, "SHORT") && argc == 1) {
+        ui_input_apply(UI_IN_SHORT);
+    } else if (!strcmp(cmd, "LONG") && argc == 1) {
+        ui_input_apply(UI_IN_LONG);
+    } else if (!strcmp(cmd, "ROOM") && argc == 1) {
+        ui_input_apply(UI_IN_ROOM);
+    } else if (!strcmp(cmd, "BURN") && argc == 3 && room >= 0) {
+        app_room_state_t rs = app_state_get()->rooms[room];
+        rs.burning = atoi(argv[2]) != 0;
+        app_state_set_room(room, &rs);
+    } else if (!strcmp(cmd, "SEL") && argc == 2) {
+        app_state_set_sel(atoi(argv[1]));
+    } else if (!strcmp(cmd, "BRIGHT") && argc == 2) {
+        app_state_set_brightness(atoi(argv[1]));
+    } else if (!strcmp(cmd, "STIME") && argc == 2) {
+        app_state_set_screen_time(atoi(argv[1]));
+    } else if (!strcmp(cmd, "DUMP") && argc == 1) {
+        dump(out, arg);
+        return;
     } else if (!strcmp(cmd, "WIFI") && argc == 2) {
         app_state_set_wifi(atoi(argv[1]));
     } else if (!strcmp(cmd, "ANIM") && argc == 2) {
