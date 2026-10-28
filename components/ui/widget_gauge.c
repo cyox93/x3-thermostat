@@ -75,7 +75,7 @@ gauge_t *gauge_create(lv_obj_t *parent, const gauge_cfg_t *cfg)
         bool major = cfg->tick_major_every == 0 || i % cfg->tick_major_every == 0;
         polar(cfg->tick_r_in, deg, &g->tick_pts[i][0]);
         polar(major ? cfg->tick_r_out_major : cfg->tick_r_out_minor, deg, &g->tick_pts[i][1]);
-        g->ticks[i] = line_new(parent, g->tick_pts[i], UIG_TICK_W);
+        g->ticks[i] = line_new(parent, g->tick_pts[i], cfg->tick_w ? cfg->tick_w : UIG_TICK_W);
     }
 
     if (cfg->marker) {

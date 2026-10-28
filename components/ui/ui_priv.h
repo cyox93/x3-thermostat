@@ -28,6 +28,7 @@ typedef struct {
     int16_t tick_r_in, tick_r_out_major, tick_r_out_minor;
     lv_color_t tick_on_color;
     uint8_t tick_on_opa_pct, tick_off_opa_pct;
+    uint8_t tick_w;                 /* 0 = UIG_TICK_W */
     bool marker;
 } gauge_cfg_t;
 typedef struct gauge gauge_t;
@@ -67,6 +68,8 @@ lv_obj_t *screen_settings_create(void);
 void screen_settings_refresh(void);
 lv_obj_t *screen_edit_room_create(void);
 void screen_edit_room_refresh(void);
+lv_obj_t *screen_edit_value_create(void);      /* brightness and screen time */
+void screen_edit_value_refresh(void);
 
 /* ui_screens.c — create all screens, load the one for the mode, refresh all */
 void ui_screens_create(void);

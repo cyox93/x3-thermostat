@@ -4,6 +4,7 @@
 # re-run cmake configure.
 set(UI_SHARED_SRCS
     screen_edit_room.c
+    screen_edit_value.c
     screen_main.c
     screen_settings.c
     ui_input.c

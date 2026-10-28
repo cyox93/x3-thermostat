@@ -6,9 +6,9 @@
     "serve": "npx http-server .. -p 8080 -c-1 --silent",
     "golden": "node capture-golden.mjs http://localhost:8080/golden.html golden",
     "replay": "node replay-html.mjs http://localhost:8080/index.html scenarios.json out/html",
-    "diff": "node compare.mjs golden out/lvgl out/diff",
+    "diff": "node compare.mjs golden out/lvgl out/diff --max 3.5",
     "sim": "node render-sim.mjs",
-    "diff:present": "node compare.mjs golden out/lvgl out/diff --present-only",
+    "diff:present": "node compare.mjs golden out/lvgl out/diff --max 3.5 --present-only",
     "replay:sim": "node replay-sim.mjs scenarios.json out/sim-replay"
   },
   "dependencies": {

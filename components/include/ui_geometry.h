@@ -96,3 +96,20 @@
 #define UIG_ROOM_ITEM_H       48
 #define UIG_ROOM_HINT_BOTTOM  30
 #define UIG_ROOM_HINT_LS      0       /* 0.04em × 17 = 0.68; 1 made the line 6 px too wide */
+
+/* Edit screens (ScreenBrightness / ScreenScreenTime) */
+#define UIG_EDIT_TITLE_LS     2       /* 0.12em × 20 */
+#define UIG_EDIT_TITLE_MB     6
+#define UIG_EDIT_BRIGHT_H     72      /* line-height 1 */
+#define UIG_EDIT_BRIGHT_LS    (-3)    /* −0.04em × 72 = −2.88 */
+#define UIG_EDIT_PCT_GAP      3
+#define UIG_EDIT_PCT_DY       40      /* puts "%" (24 px) on the 72 px number's baseline */
+#define UIG_EDIT_TIME_H       64
+#define UIG_EDIT_TIME_LS      (-2)    /* −0.04em × 64, as the MAIN hero */
+#define UIG_EDIT_NUM_DY       0       /* measured: UIG_TIGHT_DY put these numbers 1 px high */
+#define UIG_EDIT_HINT_MT      10
+#define UIG_EDIT_HINT_LS      1       /* 0.04em × 13 */
+#define UIG_EDIT_HINT_OPA_PCT 80
+#define UIG_TIME_TICK_R_IN    106
+#define UIG_TIME_TICK_R_OUT   116
+#define UIG_TIME_TICK_W       1       /* design 1.4 */
