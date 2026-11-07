@@ -11,6 +11,7 @@
 
 #include "eventloop.h"
 #include "device.h"
+#include "ui.h"
 
 #include "main.h"
 
@@ -128,8 +129,12 @@ static void _key_event_handler(int id, void *arg, void *data)
 
     _screen_touch();
 
-    /* TODO: policy — map keys to lights / heating per room config */
-    ESP_LOGI(TAG, "K%d %s", key_data->ch, key_data->event == SC_SWITCH_KEY_LONG ? "LONG" : "CLICK");
+    /* K1 is the push the knob lacks; K2 is the ROOM button (docs/ui.md §2.1).
+       TODO: policy — map the other keys to lights per room config */
+    bool lng = key_data->event == SC_SWITCH_KEY_LONG;
+    if (key_data->ch == 1) ui_input(lng ? UI_IN_LONG : UI_IN_SHORT);
+    else if (key_data->ch == 2 && !lng) ui_input(UI_IN_ROOM);
+    ESP_LOGI(TAG, "K%d %s", key_data->ch, lng ? "LONG" : "CLICK");
 }
 
 static void _encoder_event_handler(int id, void *arg, void *data)
@@ -139,8 +144,8 @@ static void _encoder_event_handler(int id, void *arg, void *data)
     /* TODO: at night the first detent should only wake the screen */
     _screen_touch();
 
-    /* TODO: policy — adjust the target temperature */
-    ESP_LOGI(TAG, "encoder %s", dir > 0 ? "CW" : "CCW");
+    ui_input(dir > 0 ? UI_IN_ENC_CW : UI_IN_ENC_CCW);
+    ESP_LOGD(TAG, "encoder %s", dir > 0 ? "CW" : "CCW");
 }
 
 /* ========== Brightness ========== */

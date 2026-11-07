@@ -12,3 +12,7 @@ typedef enum {
 
 /* Starts the LVGL task and draws the first screen. Call after sc_device_init(). */
 esp_err_t ui_init(void);
+
+/* Any thread: queues the input for the LVGL task and returns (docs/ui.md §3.3).
+   Dropped with a warning when the queue is full. */
+void ui_input(ui_input_t in);
