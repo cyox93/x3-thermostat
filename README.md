@@ -59,6 +59,7 @@ npm run replay:sim                       # scenarios.json을 sim에 재생
 | 명령 | 동작 |
 |---|---|
 | `lcd_color <r> <g> <b>` | LCD 전체를 한 색으로 |
+| `lcd_id` | 패널 ID · 상태 읽기 (SDA 비트뱅) — 명령이 패널에 닿는지 확인 |
 | `led_on <on\|off>` | LED Ring + 백라이트 on/off (마지막 밝기 복원) |
 | `led_brightness <0-255>` | 백라이트 PWM 듀티 (Ring은 on/off로만 반응) |
 | `led_color <red\|white>` | LED Ring 색 |

@@ -2,13 +2,13 @@
 
 > **이 펌웨어의 작업 순서**를 다룬다. 상태: ✅ 완료 · 🔶 진행 중 · ⬜ 미착수.
 
-## 현재 위치 (2026-09-27)
+## 현재 위치 (2026-10-27)
 
 | 항목 | 상태 |
 |---|---|
 | LCD · LED Ring · 엔코더 드라이버 (임시 배선으로 개별 동작 확인) | ✅ |
 | ESP32-S3-WROOM-1-N16R8로 타깃 전환 (16 MB · Octal PSRAM · 파티션 · USB Serial/JTAG) | ✅ 빌드 확인 |
-| 핀을 `board.h`로 모으고 main-board 설계 핀으로 교체 | ✅ 빌드 확인, **실기 미확인** |
+| 핀을 `board.h`로 모으고 main-board 설계 핀으로 교체 | ✅ main-board에서 콘솔 · LED Ring · LCD 확인 |
 | 조도 센서 ALS-PT19-315C 드라이버 (`als_read`, 대략 lux, R_L 100 kΩ) | ✅ 빌드 확인, 센서 미연결 |
 | 온습도 드라이버 `temp_humid` (AHT25, `temp_get`) | ✅ 실기 확인 (개발 보드, 2026-09-29) |
 | x3-switch 드라이버 + switchloop (AT 클라이언트, 상태 동기화, CLICK/LONG) | ✅ 빌드 확인, **실기 미확인** |
@@ -18,7 +18,7 @@
 | PLC 드라이버 (RMT RX/TX) + plcloop | ✅ 실기 수신 · echo 확인 |
 | PLC 메시지 해독 — 종류 · 방향 · 주소 · 상태 비트 · 항목 · 모드 · 등록 / 알림 / 원격 설정 순서 (LT200SPD · DT-200 실측) | ✅ `docs/plc-protocol.md` §5 — 일부 항목 미상 |
 | PLC 수신 개선 (idle 5 ms, 1024 심볼 버퍼, 그룹 100 ms) | ✅ 실기 메시지 오류 0 |
-| main-board rev A · x3_uart_board rev A | 2026-09-15 발주, 수령 대기 |
+| main-board rev A · x3_uart_board rev A | 🔶 조립 · bring-up 중 (2026-10-22~) — Phase A |
 | x3-switch 펌웨어 AT 규격 0.1.0 | ✅ 구현 · 실측 (K4 리셋 문제 제외) |
 | UI (LVGL 9, `components/ui` · `components/state`) — 모든 화면 · 상태 머신 · 누름 플래시 | 🔶 sim에서 golden 29장 · `scenarios.json` 통과 (`docs/ui.md`), 실기 연결은 3단계 |
 
@@ -36,14 +36,14 @@
 
 **펌웨어**
 
-- [ ] USB-C만 연결: 3V3, 부팅, USB Serial/JTAG 콘솔, BOOT · RESET
-- [ ] PSRAM 8 MB 인식 (`heap_caps_get_total_size(MALLOC_CAP_SPIRAM)`)
+- [x] USB-C만 연결: 3V3, 부팅, USB Serial/JTAG 콘솔, BOOT · RESET (2026-10-22). 처음엔 USB가 안 잡혔다 — USB-C 소켓 D+ · D− 납땜 단락. 새 모듈은 첫 플래시에 BOOT+RESET이 필요하다 ([hardware.md](hardware.md) §1.2)
+- [x] PSRAM 8 MB 인식 (부팅 로그: Octal 80 MHz, 메모리 시험 통과)
 - [ ] 보드 RGB LED (IO21, RMT/`led_strip`) — 드라이버 추가
-- [ ] 패널을 main FFC로 연결: LCD 초기화 · 색 채우기
-- [ ] LED Ring / 백라이트 PWM · 색 전환
-- [ ] 엔코더 — 한 칸당 카운트(`ENCODER_COUNTS_PER_DETENT` = 2 가정) · **방향 부호** 확인, 패널 쪽 풀업 유무 → R11 · R12 실장 결정
+- [x] 패널을 main FFC로 연결: LCD 초기화 · 색 채우기 — CON1-11 · 12의 RES · DC가 분석과 반대였다. `board.h`에서 바꿈 ([hardware.md](hardware.md) §3.2)
+- [x] LED Ring / 백라이트 PWM · 색 전환 (2026-10-27, CN1-9 = IO14)
+- [x] 엔코더 — 한 칸 = 2카운트, 시계 방향 = +. CON1-1이 엔코더 공통이라 IO8을 LOW로 구동, 내부 풀업으로 충분 → R11 · R12 비움 ([hardware.md](hardware.md) §3.4)
 - [ ] SPI 클럭 · 직렬 저항 — FFC 길이 확정 후 파형으로
-- [ ] 불명 신호 IO8 관찰 (ADC 값 로그)
+- [x] 불명 신호 IO8 — 엔코더 공통이었다
 - [x] 온습도(AHT25): `temp_get` 응답 · 값 확인 (개발 보드: 27.0°C / 46.5%RH, sysloop 10 s 주기 측정도 `sysinfo`로 확인)
 - [ ] 온습도(AHT25): main-board에서 R14 · R15 실장 상태로 다시 확인
 - [ ] 센서 없이 보드만 켤 때는 `bright normal` — 안 하면 20 s 뒤 NIGHT로 화면이 꺼진다
@@ -115,7 +115,7 @@
 | 2 | 큰방 버튼 배정 (전등 3개, K3 · K4 외 한 개) | sysloop 방 설정 |
 | 3 | K4 → x3-switch 리셋 (하드웨어 수리 필요) | K4를 정책에서 제외 중 |
 | 4 | AHT25 배치 (발열) | 온도 보정 필요 여부 |
-| 5 | 불명 신호 IO8 | 무시해도 되는지 |
+| 5 | ~~불명 신호 IO8~~ | 엔코더 공통으로 밝혀짐 (2026-11-08) |
 | 6 | 조도 센서 배치 · 차광 — 방을 보면서 유닛 자신의 빛(LCD · Ring · 버튼 LED)은 안 보는 자리 | 자동 밝기의 되먹임 |
 | 7 | 조도 센서 부하 저항 — 100 kΩ 채택, 실제 방에서 값 확인 필요 | 밤 경계(3 lux ≈ 45 mV) 분해능 |
 | 8 | 난방 판단 방식 (히스테리시스 폭, 최소 ON/OFF 시간) | MC200 쪽 동작 확인 후 결정 |

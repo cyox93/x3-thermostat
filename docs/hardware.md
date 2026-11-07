@@ -23,6 +23,17 @@
 | 0 · 3 · 45 · 46 | 스트래핑. IO0은 BOOT 스위치에만 쓴다 |
 | 19 · 20 | USB |
 
+### 1.2 첫 플래시 · 콘솔
+
+- 새 모듈에는 공장 펌웨어(TinyUSB 예제, USB 이름 `Espressif Device`)가 들어 있어 esptool이
+  자동 리셋을 못 한다. **처음 한 번은 BOOT를 누른 채 RESET** → `USB JTAG_serial debug unit`으로
+  잡히면 플래시한다. 그 뒤로는 자동 리셋이 된다.
+- 콘솔 포트를 열 때 DTR · RTS를 내린 상태로 연다. 둘 다 올라간 채 열면 USB Serial/JTAG가
+  esptool의 리셋 순서로 받아들여 `boot:0x0 (DOWNLOAD)`로 재부팅한다 — BOOT가 눌린 것처럼 보인다.
+- USB가 아예 안 잡히면(호스트에 아무것도 안 뜸) 다운로드 모드에서 D+ · D− 전압을 잰다.
+  정상은 D+ ≈ 3.3 V, D− ≈ 0 V. **둘 다 3.3 V면 D+ · D− 단락**이다 — rev A 첫 보드는 USB-C
+  소켓 납땜 단락이었다 (2026-10-22).
+
 ## 2. 핀맵
 
 ### 2.1 GPIO 순 전체 맵
@@ -40,8 +51,8 @@
 | 5 | — | | J3-11 | | | 범용, ADC1_CH4 |
 | 6 | — | | J3-10 | | | 범용, ADC1_CH5 |
 | 7 | — | | J3-9 | | | 범용, ADC1_CH6 |
-| 8 | 불명 신호 (X3 CON1-1) | ← | J3-4 | 1 | `BOARD_UNKNOWN_PIN` | ADC1_CH7, R13 1 kΩ |
-| 9 | LCD_DC | → | | 11 | `BOARD_LCD_PIN_DC` | |
+| 8 | 엔코더 공통 (X3 CON1-1) | → | J3-4 | 1 | `BOARD_ENC_COM_PIN` | LOW 출력, R13 1 kΩ → [§3.4](#34-엔코더) |
+| 9 | LCD_RES | → | | 11 | `BOARD_LCD_PIN_RST` | CN1-11은 RES → [§3.2](#32-lcd-gc9a01a) |
 | 10 | LCD_CS | → | | 10 | `BOARD_LCD_PIN_CS` | FSPI |
 | 11 | LCD_MOSI | → | | 7 | `BOARD_LCD_PIN_MOSI` | FSPI, R8 33 Ω |
 | 12 | LCD_SCK | → | | 8 | `BOARD_LCD_PIN_SCLK` | FSPI, R7 33 Ω |
@@ -49,7 +60,7 @@
 | 14 | LCD 백라이트 + LED Ring EN | → | | 9 | `BOARD_BL_RING_PIN` | LEDC PWM |
 | 15 | — | | J3-8 | | | 범용 (ADC2 — WiFi 중 ADC 불가) |
 | 16 | — | | J3-7 | | | 범용 (ADC2) |
-| 17 | LCD_RES | → | J3-6 | 12 | `BOARD_LCD_PIN_RST` | |
+| 17 | LCD_DC | → | J3-6 | 12 | `BOARD_LCD_PIN_DC` | CN1-12는 DC |
 | 18 | x3-switch RX (UART1 TX) | → | J3-5 | 13 | `BOARD_X3SWITCH_TX_PIN` | |
 | 19 | USB D− | | | | | USB-C, R3 22 Ω |
 | 20 | USB D+ | | | | | USB-C, R4 22 Ω |
@@ -78,13 +89,13 @@
 | LCD_MOSI | **11** | → | main-board R8 33 Ω | FSPI IOMUX 핀 |
 | LCD_SCK | **12** | → | main-board R7 33 Ω | 〃 |
 | LCD_CS | **10** | → | | 〃 |
-| LCD_DC | **9** | → | | HIGH = data |
-| LCD_RES | **17** | → | x3_uart_board 10 kΩ 풀다운 | |
+| LCD_RES | **9** | → | | CN1-11. 풀다운 없음 → 부팅 중 IO9가 떠 있다 |
+| LCD_DC | **17** | → | x3_uart_board 10 kΩ 풀다운 | CN1-12. HIGH = data. 풀다운은 원래 RES용으로 넣은 것 |
 | LCD_BL + RING_EN | **14** | → | x3_uart_board 100 kΩ 풀다운 | LEDC PWM. 공용 선 → [§3.1](#31-lcd-백라이트와-led-ring은-한-선이다) |
 | RING_COLOR | **47** | → | | LOW = red, HIGH = white |
 | ENC_A | **38** | ← | R9 1 kΩ, 풀업 자리 R11 (DNP) | PCNT |
 | ENC_B | **48** | ← | R10 1 kΩ, 풀업 자리 R12 (DNP) | PCNT |
-| 불명 (X3 CON1-1) | **8** | ← | R13 1 kΩ, C6 (DNP) | ADC1. 용도 확인 전까지 입력으로만 |
+| ENC_COM (X3 CON1-1) | **8** | → | R13 1 kΩ, C6 (DNP) | 엔코더 공통. LOW로 구동 |
 | x3-switch RX (ESP TX) | **18** | → | x3_uart_board 330 Ω | UART1. 회로도 넷 이름 `MM32_RX` |
 | x3-switch TX (ESP RX) | **13** | ← | x3_uart_board 330 Ω | UART1. 내부 풀업 사용. 회로도 넷 이름 `MM32_TX` |
 
@@ -125,10 +136,22 @@ UI 설계 시 "화면은 켜고 Ring만 끔"이 불가능하다는 점을 전제
 | 버스 | SPI2 (FSPI), mode 0, 쓰기 전용 (MISO 없음) |
 | 클럭 | 현재 **40 MHz**. main FFC 길이가 정해진 뒤 파형 보고 조정 (R7 · R8 33 Ω 포함) |
 | 픽셀 | RGB565, BGR 순서, 반전(INVON) 필요 |
-| 리셋 | IO17 하드웨어 리셋 후 120 ms 대기 |
+| 리셋 | IO9 하드웨어 리셋 후 120 ms 대기 |
 
 X3 원본 경로의 120 Ω 댐핑(R32 · R37)은 CON1을 비우므로 경로에서 빠진다.
 main-board의 33 Ω가 그 역할을 대신한다.
+
+**CON1-11은 RES, CON1-12는 DC다 (2026-11-07 확인).** main-board 설계의 근거가 된 X3 분석은
+11 = DC, 12 = RES로 적었는데 반대였다. 보드는 그대로 두고 `board.h`에서 IO9 = RES, IO17 = DC로 바꿨다.
+
+- 증상: 백라이트만 켜지고 화면이 검다. 명령마다 DC를 Low로 내리는 것이 패널을 리셋했다.
+  main-board(2026-10-27)와 패널 FPC에 직결한 S3 DevKit 모두 같았다.
+  1 MHz로 낮춰도, 백라이트를 PWM 대신 DC High로 켜도, 초기화를 바이트마다 CS를 토글하는
+  비트뱅으로 바꿔도 같았다. `lcd_id`도 응답이 없었다 (SDA에 마지막으로 구동한 비트만 남는다).
+- 근거: 원래 X3가 패널을 구동하는 중에 CON1을 로직 분석기로 잡았다.
+  12번은 명령 바이트(`2A` · `2B` · `2C`)에서만 Low이고 11번은 내내 High였다.
+- 원래 X3의 구동: SCK 약 16.7 MHz, 바이트마다 CS 토글, 화면 일부만 다시 그린다.
+- 바꾼 뒤 main-board에서 화면이 나온다.
 
 ### 3.3 PLC 모듈
 
@@ -145,10 +168,13 @@ main-board의 33 Ω가 그 역할을 대신한다.
 
 - 회전 전용, push 없음. PCNT 두 채널로 4배 체배, 글리치 필터 1 µs.
 - 한 칸(detent)마다 PCNT limit(= watch point)에 닿아 **ISR 콜백**이 한 번 불린다 — 폴링 없음.
-  한 칸 = 카운트 2로 가정했다(`ENCODER_COUNTS_PER_DETENT`, 시제품의 폴링 코드 기준).
-  **main-board에서 한 칸당 카운트와 방향 부호를 다시 확인한다.** `encoder_read`는 누적 카운트.
-- 패널 쪽에 풀업이 있는지 아직 모른다 → R11 · R12(DNP) 실장 여부는 첫 보드에서 판단.
-  그 전까지는 ESP32 내부 풀업으로 시험한다.
+  한 칸 = 카운트 2(`ENCODER_COUNTS_PER_DETENT`), **시계 방향 = +**. `encoder_read`는 누적 카운트.
+  main-board에서 시계 방향 5칸 = +10, 반시계 5칸 = −10 (2026-11-08).
+- **CON1-1이 엔코더 공통이다.** A · B 접점은 이 선으로 닫히는데, 패널도 main-board도 이 선을
+  접지하지 않는다. `encoder.c`가 IO8을 LOW 출력으로 둔다 — 떠 있으면 A · B가 풀업 때문에
+  계속 HIGH라 카운트가 0이다. (원래 X3 분석은 이 선을 "불명, 정적 HIGH"로 적었다.)
+- 패널에 풀업이 없다. ESP32 내부 풀업으로 안정적으로 세므로 R11 · R12는 비워 둔다.
+  PCNT 드라이버는 풀업을 켜지 않으므로 `encoder.c`가 `gpio_pullup_en`으로 켠다.
 
 ### 3.5 AHT25
 
