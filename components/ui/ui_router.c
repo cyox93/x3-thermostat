@@ -54,9 +54,9 @@ esp_err_t ui_init(void)
         .hres = UI_LCD_W,
         .vres = UI_LCD_H,
         .color_format = LV_COLOR_FORMAT_RGB565,
-        /* The X3 panel is mounted with columns running right to left (MADCTL
-         * 0x48). The port rewrites the panel's mirror bits from this at start. */
-        .rotation = { .mirror_x = true },
+        /* The X3 panel is mounted with rows running bottom to top (MADCTL MY,
+         * 0x88). The port rewrites the panel's mirror bits from this at start. */
+        .rotation = { .mirror_y = true },
         /* The panel takes big-endian pixels and no longer swaps itself */
         .flags = { .buff_dma = true, .swap_bytes = true },
     };

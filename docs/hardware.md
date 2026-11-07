@@ -136,6 +136,7 @@ UI 설계 시 "화면은 켜고 Ring만 끔"이 불가능하다는 점을 전제
 | 버스 | SPI2 (FSPI), mode 0, 쓰기 전용 (MISO 없음) |
 | 클럭 | 현재 **40 MHz**. main FFC 길이가 정해진 뒤 파형 보고 조정 (R7 · R8 33 Ω 포함) |
 | 픽셀 | RGB565, BGR 순서, 반전(INVON) 필요 |
+| 방향 | **상하 미러(MADCTL MY)** 필요. esp_lvgl_port가 시작할 때 미러 비트를 다시 쓰므로 `ui_router.c`의 `rotation.mirror_y`에서 정한다 |
 | 리셋 | IO9 하드웨어 리셋 후 120 ms 대기 |
 
 X3 원본 경로의 120 Ω 댐핑(R32 · R37)은 CON1을 비우므로 경로에서 빠진다.
