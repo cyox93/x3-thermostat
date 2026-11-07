@@ -45,3 +45,6 @@ esp_err_t ui_init(void)
     ESP_LOGI(TAG, "LVGL %d.%d.%d up", LVGL_VERSION_MAJOR, LVGL_VERSION_MINOR, LVGL_VERSION_PATCH);
     return ESP_OK;
 }
+        /* The X3 panel is mounted with columns running right to left (MADCTL
+         * 0x48). The port rewrites the panel's mirror bits from this at start. */
+        .rotation = { .mirror_x = true },
