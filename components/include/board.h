@@ -35,9 +35,9 @@
 #define BOARD_ENC_A_PIN         38
 #define BOARD_ENC_B_PIN         48
 
-/* X3 CON1-1. Purpose unknown — static HIGH on the original X3 board.
- * Routed to an ADC1 pin so it can be observed. */
-#define BOARD_UNKNOWN_PIN       8
+/* X3 CON1-1 is the encoder common: A/B count only while it is LOW
+ * (bench, 2026-11-08). Driven LOW through R13 1 kΩ. */
+#define BOARD_ENC_COM_PIN       8
 
 /* --- x3-switch board (AT protocol over UART) ------------------------- */
 

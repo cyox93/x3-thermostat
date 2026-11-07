@@ -96,11 +96,18 @@ esp_err_t sc_encoder_init(void)
     ESP_RETURN_ON_ERROR(pcnt_channel_set_edge_action(chan_b, PCNT_CHANNEL_EDGE_ACTION_INCREASE, PCNT_CHANNEL_EDGE_ACTION_DECREASE), TAG, "set edge_b failed");
     ESP_RETURN_ON_ERROR(pcnt_channel_set_level_action(chan_b, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE), TAG, "set level_b failed");
 
-    /* The PCNT driver only enables the inputs. Whether the panel pulls the
-     * contacts up is unknown (R11/R12 are DNP), so use the internal pull-ups
-     * until the first board says otherwise (docs/hardware.md §3.4). */
+    /* The PCNT driver only enables the inputs, and the panel has no pull-ups
+     * (R11/R12 are DNP), so use the internal ones. The contacts close to the
+     * encoder common on CON1-1, which nothing grounds: drive it LOW or A/B
+     * never leave HIGH (docs/hardware.md §3.4). */
     ESP_RETURN_ON_ERROR(gpio_pullup_en(ENCODER_GPIO_A), TAG, "pullup a failed");
     ESP_RETURN_ON_ERROR(gpio_pullup_en(ENCODER_GPIO_B), TAG, "pullup b failed");
+    gpio_config_t com_cfg = {
+        .pin_bit_mask = 1ULL << BOARD_ENC_COM_PIN,
+        .mode = GPIO_MODE_OUTPUT,
+    };
+    ESP_RETURN_ON_ERROR(gpio_set_level(BOARD_ENC_COM_PIN, 0), TAG, "com level failed");
+    ESP_RETURN_ON_ERROR(gpio_config(&com_cfg), TAG, "com config failed");
 
     ESP_RETURN_ON_ERROR(pcnt_unit_add_watch_point(s_pcnt_unit, ENCODER_COUNTS_PER_DETENT), TAG, "watch high failed");
     ESP_RETURN_ON_ERROR(pcnt_unit_add_watch_point(s_pcnt_unit, -ENCODER_COUNTS_PER_DETENT), TAG, "watch low failed");
