@@ -18,8 +18,12 @@
 #define BOARD_LCD_PIN_MOSI      11
 #define BOARD_LCD_PIN_SCLK      12
 #define BOARD_LCD_PIN_CS        10
-#define BOARD_LCD_PIN_DC        9
-#define BOARD_LCD_PIN_RST       17
+/* The panel has RES on CON1-11 and DC on CON1-12, the reverse of the X3
+ * board analysis the main-board was drawn from (logic capture of the original
+ * X3 driving the panel, 2026-11-07). IO9 reaches CN1-11 and IO17 CN1-12, so
+ * the roles are swapped here rather than on the board. */
+#define BOARD_LCD_PIN_DC        17
+#define BOARD_LCD_PIN_RST       9
 
 /* LCD backlight and LED ring enable share one net (X3 CON1-9). PWM dims the
  * LCD; the ring only sees on/off. 0 turns both off. */
