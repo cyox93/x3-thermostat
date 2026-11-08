@@ -78,11 +78,11 @@ function FlameIcon({ size = 16, color, still = false }) {
 }
 
 function BoilerBadge({ burning }) {
-  const c = burning ? BOILER_ACCENT : '#8e8e95';
   return (
     <div style={{ position: 'absolute', top: 26, left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: 5, pointerEvents: 'none' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'Pretendard', fontSize: 12, fontWeight: 600, letterSpacing: '0.04em', color: burning ? '#ffffff' : '#a8a8ae' }}>
-        <FlameIcon size={10} color={burning ? undefined : c} still={!burning} />
+        {/* flame slot always kept so the text never moves; the flame shows only while burning */}
+        <div style={{ display: 'flex', visibility: burning ? 'visible' : 'hidden' }}><FlameIcon size={10} still={!burning} /></div>
         보일러
       </div>
     </div>
@@ -144,7 +144,8 @@ function ScreenBoiler({ roomName, currentTemp, humidity = null, state, burning =
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 0, paddingBottom: summary ? 16 : 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'Pretendard', fontSize: 20, fontWeight: 500, letterSpacing: '0.13em', color: QA.dim, marginBottom: 5 }}>
-          {heating ? <FlameIcon size={14} /> : <FlameIcon size={14} color="#6e6e75" still />}
+          {/* the slot is always kept so the room name never moves; only the flame shows or hides */}
+          <div style={{ display: 'flex', visibility: heating ? 'visible' : 'hidden' }}><FlameIcon size={14} still={!heating} /></div>
           {roomName}
         </div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, whiteSpace: 'nowrap', fontFamily: 'Pretendard', fontSize: 21, fontWeight: 500, letterSpacing: '0.02em', color: QA.dim, marginBottom: 4 }}>
