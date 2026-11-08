@@ -13,9 +13,9 @@ const { useState, useRef, useEffect, useCallback } = React;
 
 const QA = {
   bg: '#0e0e10',
-  bg2: '#1a1a1d',
-  fg: '#f5f3ee',
-  dim: '#7a7a80',
+  bg2: '#4a4a52',
+  fg: '#ffffff',
+  dim: '#d0d0d4',
 };
 const BOILER_ACCENT = '#e88a5e';
 const SETTING_ACCENT = '#cfcfcf';
@@ -42,7 +42,7 @@ function arcPath(cx, cy, r, startDeg, endDeg) {
 function StatusBar({ wifi }) {
   return (
     <div style={{
-      position: 'absolute', bottom: 14, left: 0, right: 0,
+      position: 'absolute', bottom: 22, left: 0, right: 0,
       display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10,
       zIndex: 6, pointerEvents: 'none',
       fontFamily: 'JetBrains Mono', fontSize: 9, color: QA.dim, letterSpacing: '0.08em',
@@ -78,10 +78,10 @@ function FlameIcon({ size = 16, color, still = false }) {
 }
 
 function BoilerBadge({ burning }) {
-  const c = burning ? BOILER_ACCENT : '#4a4a50';
+  const c = burning ? BOILER_ACCENT : '#8e8e95';
   return (
     <div style={{ position: 'absolute', top: 26, left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: 5, pointerEvents: 'none' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'Pretendard', fontSize: 12, fontWeight: 500, letterSpacing: '0.04em', color: burning ? '#d8d6d0' : '#5a5a60' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'Pretendard', fontSize: 12, fontWeight: 600, letterSpacing: '0.04em', color: burning ? '#ffffff' : '#a8a8ae' }}>
         <FlameIcon size={10} color={burning ? undefined : c} still={!burning} />
         보일러
       </div>
@@ -91,14 +91,14 @@ function BoilerBadge({ burning }) {
 
 function RoomSummary({ rooms, activeName }) {
   return (
-    <div style={{ position: 'absolute', bottom: 34, left: 0, right: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 5, zIndex: 5, pointerEvents: 'none' }}>
+    <div style={{ position: 'absolute', bottom: 44, left: 0, right: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 3, zIndex: 5, pointerEvents: 'none' }}>
       {rooms.map(r => {
         const active = r.name === activeName;
         const burn = r.on && r.burning;
-        const c = r.on ? '#b8b8bc' : '#4a4a50';
+        const c = r.on ? '#ffffff' : '#9a9aa0';
         return (
-          <div key={r.name} style={{ display: 'flex', alignItems: 'center', padding: '1px 4px 1px 2px', borderRadius: 4, border: `1px solid ${active ? '#b8b8bc' : 'transparent'}` }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 2, fontFamily: 'Pretendard', fontSize: 12, fontWeight: 500, lineHeight: 1.1, color: c }}>
+          <div key={r.name} style={{ display: 'flex', alignItems: 'center', padding: '1px 4px 1px 2px', borderRadius: 4, border: `1px solid ${active ? '#ffffff' : 'transparent'}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2, fontFamily: 'Pretendard', fontSize: 12, fontWeight: 600, lineHeight: 1.1, color: c }}>
               <div style={{ width: 9, height: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', visibility: burn ? 'visible' : 'hidden' }}>
                 <FlameIcon size={9} color={c} still />
               </div>
@@ -125,62 +125,43 @@ function ScreenBoiler({ roomName, currentTemp, humidity = null, state, burning =
   const curRad = (curDeg - 90) * Math.PI / 180;
 
   const rArc = 100;
-  const rTickIn = 108, rTickOutMaj = 116, rTickOutMin = 112;
-  const rCurIn = 105, rCurOut = 122;
+  // current-temp marker straddles the arc, kept well inside the bezel
+  const rCurIn = 91, rCurOut = 109;
 
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
       <style>{`@keyframes qa-flame{0%,100%{transform:scale(1,1)}30%{transform:scale(.92,1.08)}60%{transform:scale(1.05,.94)}}`}</style>
       <svg viewBox={`0 0 ${VB} ${VB}`} style={{ position: 'absolute', inset: 0 }}>
-        <path d={arcPath(CX, CY, rArc, startDeg, endDeg)} stroke={QA.bg2} strokeWidth="2" fill="none" />
+        <path d={arcPath(CX, CY, rArc, startDeg, endDeg)} stroke={QA.bg2} strokeWidth="7" fill="none" />
         {state.on && (
-          <path d={arcPath(CX, CY, rArc, startDeg, valDeg)} stroke={BOILER_ACCENT} strokeWidth="2.5" fill="none" strokeLinecap="round" />
+          <path d={arcPath(CX, CY, rArc, startDeg, valDeg)} stroke={BOILER_ACCENT} strokeWidth="8" fill="none" strokeLinecap="round" />
         )}
-        {Array.from({ length: 16 }).map((_, i) => {
-          const tt = i / 15;
-          const deg = startDeg + (endDeg - startDeg) * tt;
-          const rad = (deg - 90) * Math.PI / 180;
-          const major = i % 3 === 0;
-          const r1 = rTickIn, r2 = major ? rTickOutMaj : rTickOutMin;
-          const active = state.on && tt <= t;
-          return <line key={i}
-            x1={CX + r1 * Math.cos(rad)} y1={CY + r1 * Math.sin(rad)}
-            x2={CX + r2 * Math.cos(rad)} y2={CY + r2 * Math.sin(rad)}
-            stroke={active ? QA.fg : QA.dim} strokeWidth={major ? 1 : 0.6} opacity={active ? 0.85 : 0.3} />;
-        })}
         <line
           x1={CX + rCurIn * Math.cos(curRad)} y1={CY + rCurIn * Math.sin(curRad)}
           x2={CX + rCurOut * Math.cos(curRad)} y2={CY + rCurOut * Math.sin(curRad)}
-          stroke="#7fc8d4" strokeWidth="2.5" strokeLinecap="round" opacity="0.95"
+          stroke="#7fc8d4" strokeWidth="4" strokeLinecap="round" opacity="0.95"
         />
       </svg>
-      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: summary ? 14 : 0, paddingBottom: summary ? 16 : 0 }}>
-        <div style={{ fontFamily: 'Pretendard', fontSize: 20, fontWeight: 500, letterSpacing: '0.13em', color: QA.dim, marginBottom: 5 }}>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 0, paddingBottom: summary ? 16 : 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'Pretendard', fontSize: 20, fontWeight: 500, letterSpacing: '0.13em', color: QA.dim, marginBottom: 5 }}>
+          {heating ? <FlameIcon size={14} /> : <FlameIcon size={14} color="#6e6e75" still />}
           {roomName}
         </div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, whiteSpace: 'nowrap', fontFamily: 'Pretendard', fontSize: 17, fontWeight: 400, letterSpacing: '0.04em', color: QA.dim, marginBottom: 3 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, whiteSpace: 'nowrap', fontFamily: 'Pretendard', fontSize: 21, fontWeight: 500, letterSpacing: '0.02em', color: QA.dim, marginBottom: 4 }}>
           <span>현재 {currentTemp.toFixed(1)}°</span>{humidity != null && <span>{Math.round(humidity)}%</span>}
         </div>
-        {state.on ? (
-          <>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', fontFamily: 'Inter Tight', fontSize: 64, fontWeight: 200, lineHeight: 1, color: QA.fg, letterSpacing: '-0.04em', marginTop: 2, whiteSpace: 'nowrap' }}>
+        {/* fixed-height slot: ON/OFF swaps only this content, nothing else moves */}
+        <div style={{ height: 66, marginTop: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {state.on ? (
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', fontFamily: 'Inter Tight', fontSize: 64, fontWeight: 300, lineHeight: 1, color: QA.fg, letterSpacing: '-0.04em', whiteSpace: 'nowrap' }}>
               {target.toFixed(1)}<span style={{ fontSize: 28, color: QA.dim, marginLeft: 4, lineHeight: 1, alignSelf: 'flex-start' }}>°</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'Pretendard', fontSize: 15, fontWeight: 500, color: BOILER_ACCENT, marginTop: 4, letterSpacing: '0.04em' }}>
-              {heating && <FlameIcon size={14} />}
-              희망온도
-            </div>
-          </>
-        ) : (
-          <>
-            <div style={{ fontFamily: 'Inter Tight', fontSize: 60, fontWeight: 200, lineHeight: 1, color: QA.dim, letterSpacing: '-0.04em', marginTop: 4 }}>
+          ) : (
+            <div style={{ fontFamily: 'Inter Tight', fontSize: 60, fontWeight: 300, lineHeight: 1, color: QA.dim, letterSpacing: '-0.04em' }}>
               OFF
             </div>
-            <div style={{ fontFamily: 'Pretendard', fontSize: 14, fontWeight: 500, color: QA.dim, marginTop: 6 }}>
-              버튼을 눌러 켜기
-            </div>
-          </>
-        )}
+          )}
+        </div>
       </div>
       {summary && <BoilerBadge burning={summary.some(r => r.on && r.burning)} />}
       {summary && <RoomSummary rooms={summary} activeName={roomName} />}
@@ -202,7 +183,7 @@ function ScreenSettings({ items, selected, settings }) {
       <div style={{
         position: 'absolute', top: 36, left: 0, right: 0,
         textAlign: 'center', fontFamily: 'Pretendard', fontSize: 18, fontWeight: 500,
-        letterSpacing: '0.18em', color: QA.dim, opacity: 0.75,
+        letterSpacing: '0.18em', color: QA.dim,
       }}>설정</div>
 
       <div style={{
@@ -246,7 +227,7 @@ function ScreenRoomEdit({ selected }) {
       <div style={{
         position: 'absolute', top: 36, left: 0, right: 0,
         textAlign: 'center', fontFamily: 'Pretendard', fontSize: 18, fontWeight: 500,
-        letterSpacing: '0.18em', color: QA.dim, opacity: 0.75,
+        letterSpacing: '0.18em', color: QA.dim,
       }}>방 선택</div>
       <div style={{
         position: 'absolute', top: '50%', left: 0, right: 0,
@@ -272,7 +253,7 @@ function ScreenRoomEdit({ selected }) {
         })}
       </div>
       <div style={{
-        position: 'absolute', bottom: 30, left: 0, right: 0, textAlign: 'center',
+        position: 'absolute', bottom: 40, left: 0, right: 0, textAlign: 'center',
         fontFamily: 'Pretendard', fontSize: 17, fontWeight: 500, color: QA.dim, letterSpacing: '0.04em',
       }}>돌려 선택 · 눌러 확인</div>
     </div>
@@ -286,17 +267,17 @@ function ScreenBrightness({ value }) {
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
       <svg viewBox={`0 0 ${VB} ${VB}`} style={{ position: 'absolute', inset: 0 }}>
-        <path d={arcPath(CX, CY, 100, startDeg, endDeg)} stroke={QA.bg2} strokeWidth="2" fill="none" />
-        <path d={arcPath(CX, CY, 100, startDeg, startDeg + (endDeg - startDeg) * t)} stroke={BOILER_ACCENT} strokeWidth="2.5" fill="none" strokeLinecap="round" />
+        <path d={arcPath(CX, CY, 100, startDeg, endDeg)} stroke={QA.bg2} strokeWidth="7" fill="none" />
+        <path d={arcPath(CX, CY, 100, startDeg, startDeg + (endDeg - startDeg) * t)} stroke={BOILER_ACCENT} strokeWidth="8" fill="none" strokeLinecap="round" />
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ fontFamily: 'Pretendard', fontSize: 20, fontWeight: 500, letterSpacing: '0.12em', color: QA.dim, marginBottom: 6 }}>
           화면밝기
         </div>
-        <div style={{ fontFamily: 'Inter Tight', fontSize: 72, fontWeight: 200, lineHeight: 1, color: QA.fg, letterSpacing: '-0.04em' }}>
+        <div style={{ fontFamily: 'Inter Tight', fontSize: 72, fontWeight: 300, lineHeight: 1, color: QA.fg, letterSpacing: '-0.04em' }}>
           {value}<span style={{ fontSize: 24, color: QA.dim, marginLeft: 3 }}>%</span>
         </div>
-        <div style={{ fontFamily: 'Pretendard', fontSize: 13, fontWeight: 500, letterSpacing: '0.04em', color: QA.dim, marginTop: 10, opacity: 0.8 }}>
+        <div style={{ fontFamily: 'Pretendard', fontSize: 13, fontWeight: 500, letterSpacing: '0.04em', color: QA.dim, marginTop: 10 }}>
           돌려 조절 · 눌러 확인
         </div>
       </div>
@@ -314,28 +295,17 @@ function ScreenScreenTime({ value }) {
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
       <svg viewBox={`0 0 ${VB} ${VB}`} style={{ position: 'absolute', inset: 0 }}>
-        <path d={arcPath(CX, CY, 100, startDeg, endDeg)} stroke={QA.bg2} strokeWidth="2" fill="none" />
-        <path d={arcPath(CX, CY, 100, startDeg, startDeg + (endDeg - startDeg) * t)} stroke={BOILER_ACCENT} strokeWidth="2.5" fill="none" strokeLinecap="round" />
-        {steps.map((_, i) => {
-          const tt = i / (steps.length - 1);
-          const deg = startDeg + (endDeg - startDeg) * tt;
-          const rad = (deg - 90) * Math.PI / 180;
-          const r1 = 106, r2 = 116;
-          const active = i <= idx;
-          return <line key={i}
-            x1={CX + r1 * Math.cos(rad)} y1={CY + r1 * Math.sin(rad)}
-            x2={CX + r2 * Math.cos(rad)} y2={CY + r2 * Math.sin(rad)}
-            stroke={active ? BOILER_ACCENT : QA.dim} strokeWidth="1.4" opacity={active ? 1 : 0.4} />;
-        })}
+        <path d={arcPath(CX, CY, 100, startDeg, endDeg)} stroke={QA.bg2} strokeWidth="7" fill="none" />
+        <path d={arcPath(CX, CY, 100, startDeg, startDeg + (endDeg - startDeg) * t)} stroke={BOILER_ACCENT} strokeWidth="8" fill="none" strokeLinecap="round" />
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ fontFamily: 'Pretendard', fontSize: 20, fontWeight: 500, letterSpacing: '0.12em', color: QA.dim, marginBottom: 6 }}>
           화면시간
         </div>
-        <div style={{ fontFamily: 'Inter Tight', fontSize: 64, fontWeight: 200, lineHeight: 1, color: QA.fg, letterSpacing: '-0.04em' }}>
+        <div style={{ fontFamily: 'Inter Tight', fontSize: 64, fontWeight: 300, lineHeight: 1, color: QA.fg, letterSpacing: '-0.04em' }}>
           {label}
         </div>
-        <div style={{ fontFamily: 'Pretendard', fontSize: 13, fontWeight: 500, letterSpacing: '0.04em', color: QA.dim, marginTop: 10, opacity: 0.8 }}>
+        <div style={{ fontFamily: 'Pretendard', fontSize: 13, fontWeight: 500, letterSpacing: '0.04em', color: QA.dim, marginTop: 10 }}>
           돌려 조절 · 눌러 확인
         </div>
       </div>
@@ -620,7 +590,7 @@ function App() {
   }
 
   // simulated LCD dim based on brightness setting
-  const lcdOpacity = TEST_MODE ? 1 : 0.35 + 0.65 * (settings.brightness / 100);
+  const lcdOpacity = TEST_MODE ? 1 : 0.6 + 0.4 * (settings.brightness / 100);
 
   return (
     <>
