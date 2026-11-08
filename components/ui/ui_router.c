@@ -23,6 +23,21 @@ static const char *TAG = "ui";
    safe from other threads without the lock). */
 static QueueHandle_t s_in_queue;
 
+typedef struct {
+    enum { UI_MSG_INPUT, UI_MSG_LOCAL_CLIMATE } kind;
+    ui_input_t in;
+    int16_t temp_x10;
+    int8_t humidity;
+} ui_msg_t;
+
+static void _post(const ui_msg_t *m)
+{
+    if (!s_in_queue) return;
+    if (xQueueSend(s_in_queue, m, 0) != pdTRUE) {
+        ESP_LOGW(TAG, "queue full, dropped message %d", m->kind);
+    }
+}
+
 /* Settings that survive a reboot (NVS): the installed room and the screen
    brightness. Screen time and heating are not stored yet (docs/ui.md stage 3). */
 #define UI_CFG_ROOM   "ui_room"
@@ -118,17 +133,30 @@ static void _report_room(void)
 
 void ui_input(ui_input_t in)
 {
-    if (!s_in_queue) return;
-    if (xQueueSend(s_in_queue, &in, 0) != pdTRUE) {
-        ESP_LOGW(TAG, "input queue full, dropped %d", in);
-    }
+    _post(&(ui_msg_t){ .kind = UI_MSG_INPUT, .in = in });
+}
+
+void ui_local_climate_update(int16_t temp_x10, int8_t humidity)
+{
+    _post(&(ui_msg_t){ .kind = UI_MSG_LOCAL_CLIMATE, .temp_x10 = temp_x10, .humidity = humidity });
+}
+
+/* The sensor belongs to whichever room the unit is installed in at the time */
+static void _local_climate_apply(int16_t temp_x10, int8_t humidity)
+{
+    const app_state_t *st = app_state_get();
+    app_room_state_t rs = st->rooms[st->installed_room];
+    rs.current_x10 = temp_x10 == UI_TEMP_NONE ? APP_TEMP_NONE : temp_x10;
+    rs.humidity = humidity == UI_HUM_NONE ? APP_HUM_NONE : humidity;
+    app_state_set_room(st->installed_room, &rs);
 }
 
 static void _drain(lv_timer_t *t)
 {
-    ui_input_t in;
-    while (xQueueReceive(s_in_queue, &in, 0) == pdTRUE) {
-        ui_input_apply(in);
+    ui_msg_t m;
+    while (xQueueReceive(s_in_queue, &m, 0) == pdTRUE) {
+        if (m.kind == UI_MSG_INPUT) ui_input_apply(m.in);
+        else _local_climate_apply(m.temp_x10, m.humidity);
     }
     _bright_apply();
     _settings_save();
@@ -162,7 +190,7 @@ esp_err_t ui_init(void)
     lv_display_t *disp = lvgl_port_add_disp(&disp_cfg);
     ESP_RETURN_ON_FALSE(disp, ESP_FAIL, TAG, "add_disp");
 
-    s_in_queue = xQueueCreate(UI_QUEUE_LEN, sizeof(ui_input_t));
+    s_in_queue = xQueueCreate(UI_QUEUE_LEN, sizeof(ui_msg_t));
     ESP_RETURN_ON_FALSE(s_in_queue, ESP_ERR_NO_MEM, TAG, "input queue");
 
     lvgl_port_lock(0);

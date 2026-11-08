@@ -112,16 +112,22 @@ void screen_main_refresh(void)
 
     lv_label_set_text(s.room, app_room_name(st->active_room));
 
+    /* No reading at all (sensor missing) shows "--" so the line never just
+       vanishes; a temperature without humidity drops the humidity, as the
+       design does */
     bool has_cur = r->current_x10 != APP_TEMP_NONE;
-    ui_show(s.cur_row, has_cur);
     if (has_cur) {
         char t[12];
         ui_fmt_x10(t, sizeof(t), r->current_x10);
         snprintf(buf, sizeof(buf), "현재 %s°", t);
         lv_label_set_text(s.cur_temp, buf);
+    } else {
+        lv_label_set_text(s.cur_temp, "현재 --°");
     }
-    ui_show(s.cur_hum, r->humidity != APP_HUM_NONE);
-    if (r->humidity != APP_HUM_NONE) lv_label_set_text_fmt(s.cur_hum, "%d%%", r->humidity);
+    bool has_hum = r->humidity != APP_HUM_NONE;
+    ui_show(s.cur_hum, has_hum || !has_cur);
+    if (has_hum) lv_label_set_text_fmt(s.cur_hum, "%d%%", r->humidity);
+    else lv_label_set_text(s.cur_hum, "--%");
 
     ui_show(s.hero_row, r->on);
     ui_show(lv_obj_get_parent(s.off), !r->on);

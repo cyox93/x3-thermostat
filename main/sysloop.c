@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 #include "esp_log.h"
 #include "esp_err.h"
 #include "esp_check.h"
@@ -320,8 +321,9 @@ static void _temp_set_present(bool present)
         }
     }
 
-    if (!present) {
+    if (!present && _sysloop->info.climate_valid) {
         _sysloop->info.climate_valid = false;
+        ui_local_climate_update(UI_TEMP_NONE, UI_HUM_NONE);
     }
 }
 
@@ -342,6 +344,7 @@ static void _sysloop_temp_get_cb(int id, void *arg, void *data)
     _sysloop->info.temp = temp;
     _sysloop->info.humid = humid;
     _sysloop->info.climate_valid = true;
+    ui_local_climate_update((int16_t)lroundf(temp * 10), (int8_t)lroundf(humid));
 
     /* TODO: heating decision */
     ESP_LOGD(TAG, "climate %.2f C, %.2f %%RH", temp, humid);
