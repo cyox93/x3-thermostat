@@ -19,7 +19,7 @@
 | PLC 메시지 해독 — 종류 · 방향 · 주소 · 상태 비트 · 항목 · 모드 · 등록 / 알림 / 원격 설정 순서 (LT200SPD · DT-200 실측) | ✅ `docs/plc-protocol.md` §5 — 일부 항목 미상 |
 | PLC 수신 개선 (idle 5 ms, 1024 심볼 버퍼, 그룹 100 ms) | ✅ 실기 메시지 오류 0 |
 | main-board rev A · x3_uart_board rev A | 🔶 조립 · bring-up 중 (2026-10-22~) — Phase A |
-| x3-switch 펌웨어 AT 규격 0.1.0 | ✅ 구현 · 실측 (K4 리셋 문제 제외) |
+| x3-switch 펌웨어 AT 규격 0.1.0 | ✅ 구현 · 실측 (K4 리셋은 첫 보드의 결함, 새 보드는 정상) |
 | UI (LVGL 9, `components/ui` · `components/state`) — 모든 화면 · 상태 머신 · 누름 플래시 | 🔶 sim에서 golden 29장 · `scenarios.json` 통과 (`docs/ui.md`), 실기 연결은 3단계 |
 
 ## Phase A — main-board bring-up
@@ -64,14 +64,14 @@
 ## Phase C — 로컬 온도조절기 (네트워크 없이)
 
 - [x] AHT25 10 s · 조도 1 s 주기 측정 — sysloop 타이머 (`sysinfo`로 확인)
-- [ ] sysloop 정책 — 목표 온도, 난방 ON/OFF, 키 → 전등 배정, 엔코더 → 목표 온도
+- [ ] sysloop 정책 — 목표 온도, 난방 ON/OFF, ~~키 → 전등 배정~~ (K3 · K4 = L1 · L2, 큰방 K2 = L3, 키 LED 주황 = 켜짐), ~~엔코더 → 목표 온도~~ (UI)
 - [ ] 방 설정(NVS): 전등 수, 버튼 배정, 방 이름
 - [x] UI 1단계 — LVGL 도입 (`esp_lvgl_port`), MAIN 화면, PC 시뮬레이터 · golden 비교 (`docs/ui.md` §8)
 - [x] UI 2단계 — 설정 · 방 선택 · 밝기 · 화면시간 화면, 상태 머신 (`app_input.c`), 거실 배지 · 방 요약, 시나리오 재생
-- [ ] UI 3단계 — 실기: K1/K2 · 엔코더 → UI, 방 값 API, NVS, 화면시간 · 백라이트, `ui` · `ui test` 콘솔, `replay-serial.mjs`
+- [ ] UI 3단계 — 실기: ~~K1/K2 · 엔코더 → UI~~, 방 값 API, NVS(~~설치 방 · 화면밝기~~, 화면시간 · 난방), 화면시간 · ~~백라이트~~, `ui` · `ui test` 콘솔, `replay-serial.mjs`
 - [ ] LED Ring = 난방 동작 표시, 버튼 LED = 채널 상태
 - [ ] 목표 온도 · 모드 NVS 저장/복원
-- [x] **밝기 3단계** (NORMAL / DIM / NIGHT) — 히스테리시스 · 머무름 시간 · 밤에는 화면 끄고 만지면 10 s 켜짐
+- [x] **밝기 3단계** (NORMAL / DIM / NIGHT) — 히스테리시스 · 머무름 시간. 2026-11-08부터 버튼 LED에만 쓴다 (백라이트는 UI)
 - [ ] 밤 실사용 확인 — 잘 때 방이 밝지 않은지, 깨운 화면이 되먹임을 일으키지 않는지
 - [ ] 밤에 노브 첫 칸은 화면만 깨우기, 단계 전환 페이드
 - [ ] **밝기 사양 재정리** — 실제 구현 시 단계 · 경계값 · 밤 화면 동작을 다시 정한다

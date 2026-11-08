@@ -74,7 +74,7 @@ makes them once); `replay:sim` runs `scenarios.json`. Both must pass after UI ch
 - **`main/`** — the application as *loops*, same layout as the user's `scmbd` project:
   `main.c` (init order), `main.h` (public loop APIs), `mainloop.c` (inits loops),
   `switchloop.c` (owns relays / button LEDs / keys), `sysloop.c` (owns policy, sensors,
-  display brightness levels), `plcloop.c` (gathers PLC frames into groups, sends).
+  button-LED brightness levels, key → light policy), `plcloop.c` (gathers PLC frames into groups, sends).
 - **`components/state/`** — UI state in pure C: `app_state.c` (the store, one observer),
   `app_input.c` (the design's interaction table: input → state change + flash / events).
 - **`components/ui/`** — LVGL screens (`screen_*.c`) and widgets (`widget_*.c`, draw only).
@@ -102,12 +102,13 @@ work through `ui.h`, which queues and returns (`docs/ui.md` §3.3).
    on/off only; duty 0 turns both off.
 3. **PLC `/SCTL` (IO39) must be open-drain** — the module pulls it to +5 V.
 4. **The x3-switch board has no hardware reset line.** Recovery is `AT+RST` only.
-   **K4 currently resets the board** (x3-switch `docs/hardware.md` §2.1.1) — don't use K4 in policy.
+   K4 reset the MCU on the first X3 board only (x3-switch `docs/hardware.md` §2.1.1, a board defect);
+   it works on the current board and toggles a light.
 5. **Ambient light sensor must stay on ADC1** (IO1). ADC2 is unusable with WiFi on,
    and the sensor must not see the unit's own LCD/LED light (feedback loop).
 6. USB-C alone cannot power the X3 body (relays); only the panel works on USB.
-7. **Without the ambient light sensor the screen turns off after ~20 s** (reads as dark →
-   NIGHT level). On the bench run `bright normal`.
+7. **The ambient light level only sets the button LEDs.** The LCD backlight belongs to the UI's
+   brightness setting (saved in NVS); 100 % equals IO14 held high — the panel's maximum.
 
 ## Conventions
 

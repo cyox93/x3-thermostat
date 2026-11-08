@@ -89,7 +89,7 @@ components/
   x3switch/             ✅ x3-switch AT 클라이언트 (UART)
   plc/                  ✅ PLC 모뎀 드라이버 — RMT RX 해독 · RMT TX 오픈드레인 송신 (프레임 = 1바이트)
   state/                🔶 UI 상태 (app_state) · 상호작용 표 (app_input) — 순수 C, 호스트 시험
-  ui/                   🔶 LVGL 화면 · 위젯, ui_router(esp_lvgl_port) — sim 검증 완료, sysloop 연결은 TODO
+  ui/                   🔶 LVGL 화면 · 위젯, ui_router(esp_lvgl_port) — 입력 큐 · 설치 방 콜백 · 화면밝기 · NVS, 화면시간 등은 TODO
 tools/
   sim/                  PC 시뮬레이터 (SDL2) + 단위 시험 — docs/ui.md §6
   fonts/                디자인 폰트 → LVGL 변환
@@ -117,9 +117,10 @@ loop 파일의 형식은 `scmbd` 프로젝트와 같다 — `_xxxloop_t` 상태 
 [드라이버 콜백]                       [loop 스레드]
 x3switch "+KEY" (UART 태스크) ──post──▶ switchloop: DOWN/UP → CLICK/LONG ──콜백──post──▶ sysloop
 x3switch "+READY" ────────────post──▶ switchloop: 원하는 상태 전부 재전송
-encoder (ISR) ──────post_from_isr──▶ sysloop (밤이면 화면 깨우기)
+encoder (ISR) ──────post_from_isr──▶ sysloop ──ui_input()──▶ UI (LVGL 태스크)
+UI room 콜백 (LVGL 태스크) ───post──▶ sysloop: 설치 방 → 키 배정, 난방 on → K1 LED
 plc RMT RX (ISR) ──post_from_isr──▶ plcloop: 프레임 → 100 ms 조용하면 그룹 확정 → 메시지 (docs/plc-protocol.md §6)
-                        타이머 1 s ──▶ sysloop: 조도 측정 → 밝기 단계 (§3.5)
+                        타이머 1 s ──▶ sysloop: 조도 측정 → 버튼 LED 밝기 단계 (§3.5)
                         타이머 10 s ─▶ sysloop: AHT25 측정 시작 → 80 ms 타이머 → 읽기
 
 sysloop ──sc_switch_relay_set() 등──▶ switchloop: 값만 기록 → APPLY 이벤트 → AT 전송
@@ -128,11 +129,11 @@ sysloop ──sc_switch_relay_set() 등──▶ switchloop: 값만 기록 → A
 **예: 사용자가 K3를 짧게 누름**
 
 ```
-x3-switch "+KEY:3,DOWN" → switchloop: 누름 시작, 1 s 타이머
+x3-switch "+KEY:3,DOWN" → switchloop: 누름 시작, 3 s 타이머
 x3-switch "+KEY:3,UP"   → switchloop: 타이머 전에 뗌 → CLICK → sysloop
-    sysloop: 방 설정상 K3 = 전등1 → 토글 (TODO)
+    sysloop: K3 = 전등 1 (§5) → 토글
       ├─▶ sc_switch_relay_set(1, true)      ─▶ switchloop: AT+RELAY=1,1
-      ├─▶ sc_switch_led_set(3, WHITE)       ─▶ switchloop: AT+LED=3,W
+      ├─▶ sc_switch_led_set(3, ORANGE)      ─▶ switchloop: AT+LED=3,O   (켜짐 = 주황, 꺼짐 = 흰색)
       └─▶ netloop: light1/state = ON (예정)
 ```
 
@@ -160,8 +161,8 @@ x3-switch가 없거나 느려도 센서 · 엔코더 처리가 밀리지 않는�
 - 타임아웃이 나면 그 회차를 중단하고 2초 뒤 다시 시도한다 (보드가 없을 때 명령마다 100 ms씩
   쌓이지 않게). `AT+RST`로의 자동 복구는 아직 없다. **하드웨어 리셋 선은 없다.**
 - 키: DOWN에서 3초 타이머를 걸고, 타이머 전에 UP이면 CLICK, 타이머가 먼저면 LONG(누른 채로 발생).
-- 현재 **K4는 누르면 x3-switch 보드가 리셋된다** (x3-switch `hardware.md` §2.1.1). 수리 전까지
-  정책에서 K4를 쓰지 않는다.
+- K4를 누르면 x3-switch 보드가 리셋되던 것은 첫 X3 보드의 결함이었다 (x3-switch `hardware.md` §2.1.1).
+  지금 보드에서는 정상이라 전등 키로 쓴다.
 
 ### 3.4 콘솔
 
@@ -173,6 +174,10 @@ switchloop에 있다. 드라이버를 직접 부르는 명령을 두면 loop가 
 명령 목록은 루트 `README.md`.
 
 ### 3.5 밝기 자동 조절 — 밤에 방을 밝히지 않기
+
+> **2026-11-08 변경:** 조도 단계는 이제 **버튼 LED 밝기에만** 쓴다. LCD 백라이트는 UI의 화면밝기
+> 설정이 정하고(`docs/ui.md` §2.2), 밤에 화면을 끄던 동작과 깨우기 타이머는 지웠다. 아래 표의
+> LCD 백라이트 · 화면 열과 밤 화면 항목은 지난 사양이다 — 화면 끄기는 UI 화면시간이 맡는다.
 
 **목적은 잘 때 LCD · LED가 방을 밝히지 않게 하는 것이다.** 그래서 정밀한 밝기 곡선이 아니라
 어두운 쪽을 확실히 가르는 3단계로 한다. 구현은 `main/sysloop.c`의 Brightness 절.
@@ -200,7 +205,7 @@ switchloop에 있다. 드라이버를 직접 부르는 명령을 두면 loop가 
 
 **남은 것**
 
-- 밤에 노브 첫 칸은 화면만 깨우고 설정 온도는 바꾸지 않기 (TODO)
+- 화면시간이 지나면 끄고, 꺼진 화면의 첫 입력은 깨우기만 (UI, `docs/ui.md` §2.2)
 - 단계 전환 시 백라이트 페이드
 - 방마다 다르면 경계값을 NVS 방 설정으로
 
@@ -223,11 +228,18 @@ switchloop에 있다. 드라이버를 직접 부르는 명령을 두면 loop가 
 | 항목 | 큰방 | 노는방 · 일하는방 |
 |---|---|---|
 | 전등 | 3 (L1~L3) | 2 (L1 · L2) |
-| 버튼 배정 | 미결 — K1 또는 K2를 세 번째 등에 | K3 · K4 = 전등 1 · 2 |
+| 버튼 배정 | K3 · K4 = 전등 1 · 2, **K2 = 전등 3** | K3 · K4 = 전등 1 · 2, K2 = 없음 (거실 유닛은 K2 = 방 선택) |
 | 역할 · PLC 주소 | 방 조절기, 주소 = DT-200의 방 번호 + 1 (방별 번호는 설치 때 확인) | 〃 (거실 유닛은 거실 조절기, 주소 1) |
 | MQTT 토픽 접두사 | 방 이름 | 방 이름 |
 
-**펌웨어 바이너리는 한 개다.** 방 설정은 NVS(`core/config`)에 두고 콘솔로 기록한다 — 명령은 아직 없다 (Phase C).
+**펌웨어 바이너리는 한 개다.** 설치 방은 UI 설정 화면에서 고르고 NVS(`ui_room`)에 남는다. sysloop이
+UI의 room 콜백으로 받아 키 배정을 정한다 (`main/sysloop.c`의 `_light_key`).
+
+키 LED는 그 키가 맡은 것을 보인다 — **주황 = 켜짐, 흰색 = 꺼짐 · 기능 없음.**
+K1은 화면에 보이는 방의 난방 on/off, 전등 키는 그 전등, 거실의 K2(방 선택)는 주황이다.
+ESP32만 재부팅되면 보드의 릴레이 상태를 받아들인 뒤 LED를 그에 맞춘다.
+
+나머지 방 설정(전등 수 외의 배정, PLC 주소, MQTT)은 아직 없다 (Phase C).
 
 ## 6. 참고 문서
 

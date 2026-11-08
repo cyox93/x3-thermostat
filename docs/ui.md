@@ -29,8 +29,8 @@
 | 인코더 1 tick | 엔코더 1 detent (`sc_encoder` 콜백, dir ±1) | |
 | 버튼 짧게 | **K1 CLICK** | 엔코더에 push가 없다 (`hardware.md` §3.4) |
 | 버튼 길게 | **K1 LONG** — 누른 채 **3 s** | switchloop의 판정 시간 (K1~K4 공통). 디자인은 500 ms, 처음엔 1 s였으나 설정 진입이 너무 쉬워 3 s로 늘렸다 |
-| ROOM | **K2 CLICK** | sysloop은 늘 넘기고, 마스터가 아니면 `app_state`가 무시한다 (디자인 · `settings-room-change` 시나리오와 같다) |
-| — | K2 LONG · K3 · K4 이벤트: `UI_IN_TOUCH` | 화면을 깨우고 화면시간만 다시 센다. K4는 누르면 x3-switch가 리셋되므로 정책에 쓰지 않는다 (`architecture.md` §3.3) |
+| ROOM | **K2 CLICK** — 설치 방이 거실일 때만 | 큰방에서는 K2가 전등 L3이다. 그 밖의 방에서 K2는 기능이 없고, 넘겨도 마스터가 아니라 `app_state`가 무시한다. sysloop은 UI가 알려 주는 설치 방(§3.3 room 콜백)으로 고른다 |
+| — | K3 · K4 (큰방은 K2도) | 전등 L1 · L2 (· L3) 토글 — sysloop 정책, UI를 거치지 않는다 (`architecture.md` §5). 화면 깨우기(`UI_IN_TOUCH`)는 화면시간과 함께 넣는다 |
 
 ### 2.2 밝기
 
@@ -46,6 +46,9 @@ LCD 백라이트는 디자인대로 사용자가 정하고, UI(`ui_router`)가 �
 - 화면이 꺼질 때 모드와 편집 중인 값은 그대로 둔다 (MAIN으로 돌아가지 않는다).
 - 조도 센서의 3단계(NORMAL / DIM / NIGHT, `architecture.md` §3.5)는 **버튼 LED 밝기에만** 쓴다.
   sysloop은 LCD 백라이트를 만지지 않고, NIGHT에서 화면을 끄는 동작도 없앤다.
+- **구현 (2026-11-08):** `ui_router.c`가 편집 중 값마다 `sc_led_brightness()`를 부르고, 편집 화면을 나가면
+  NVS `ui_bright`에 저장, 부팅 때 복원한다. 실기에서 100 %(PWM 255)와 IO14 상시 High의 밝기가 같았다 —
+  패널의 최대 밝기다. 화면시간은 아직 없다 (화면은 늘 켜져 있다).
 - **되먹임 방지는 유지한다.** 켜진 화면은 센서를 밝힌다. UI가 화면 on/off를 콜백으로 알리고,
   sysloop은 화면이 켜져 있는 동안 단계를 올리지 않는다 (지금 "깨운 화면" 규칙과 같은 판단, 대상만 바뀐다).
 
@@ -149,6 +152,12 @@ typedef void (*ui_screen_callback_t)(bool on, void *arg);
 void ui_register_heat_callback(ui_heat_callback_t cb, void *arg);
 void ui_register_screen_callback(ui_screen_callback_t cb, void *arg);
 ```
+
+
+**지금 실기에 있는 것 (2026-11-08):** `ui_input()`(큐 16개, 10 ms `lv_timer`가 비운다)과
+`ui_register_room_callback(room, heat_on)` — 설치 방과 화면의 방의 난방 on을 LVGL 태스크에서 알린다.
+sysloop은 이것으로 키 배정과 K1 LED를 정한다. 설치 방과 화면밝기는 NVS(`ui_room` · `ui_bright`)에 남는다.
+나머지 API(`ui_local_climate_update` 등)는 아직 없다.
 
 ### 3.4 흐름
 
