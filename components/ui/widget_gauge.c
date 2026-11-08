@@ -4,13 +4,8 @@
 #include "ui_geometry.h"
 #include "theme.h"
 
-#define GAUGE_MAX_TICKS 16
-
 struct gauge {
-    gauge_cfg_t cfg;
     lv_obj_t *value;
-    lv_obj_t *ticks[GAUGE_MAX_TICKS];
-    lv_point_precise_t tick_pts[GAUGE_MAX_TICKS][2];
     lv_obj_t *marker;
     lv_point_precise_t marker_pts[2];
 };
@@ -55,10 +50,9 @@ static lv_obj_t *line_new(lv_obj_t *parent, lv_point_precise_t *pts, int w)
     return l;
 }
 
-gauge_t *gauge_create(lv_obj_t *parent, const gauge_cfg_t *cfg)
+gauge_t *gauge_create(lv_obj_t *parent, bool marker)
 {
     gauge_t *g = calloc(1, sizeof(*g));
-    g->cfg = *cfg;
 
     lv_obj_t *track = arc_new(parent, UIG_ARC_TRACK_W);
     lv_obj_set_style_arc_color(track, TH_BG2, LV_PART_MAIN);
@@ -70,15 +64,7 @@ gauge_t *gauge_create(lv_obj_t *parent, const gauge_cfg_t *cfg)
     lv_obj_set_style_arc_color(g->value, TH_ACCENT, LV_PART_INDICATOR);
     lv_obj_set_style_arc_rounded(g->value, true, LV_PART_INDICATOR);
 
-    for (int i = 0; i < cfg->tick_count && i < GAUGE_MAX_TICKS; i++) {
-        float deg = t_to_deg(cfg->tick_count > 1 ? i * 1000 / (cfg->tick_count - 1) : 0);
-        bool major = cfg->tick_major_every == 0 || i % cfg->tick_major_every == 0;
-        polar(cfg->tick_r_in, deg, &g->tick_pts[i][0]);
-        polar(major ? cfg->tick_r_out_major : cfg->tick_r_out_minor, deg, &g->tick_pts[i][1]);
-        g->ticks[i] = line_new(parent, g->tick_pts[i], cfg->tick_w ? cfg->tick_w : UIG_TICK_W);
-    }
-
-    if (cfg->marker) {
+    if (marker) {
         g->marker = line_new(parent, g->marker_pts, UIG_CUR_W);
         lv_obj_set_style_line_color(g->marker, TH_CURRENT, 0);
         lv_obj_set_style_line_opa(g->marker, TH_OPA_PCT(95), 0);
@@ -91,17 +77,6 @@ void gauge_set_value(gauge_t *g, bool show, int t_pm)
 {
     lv_arc_set_value(g->value, t_pm);
     ui_show(g->value, show);
-
-    int n = g->cfg.tick_count;
-    for (int i = 0; i < n; i++) {
-        /* design: active when i/(n-1) <= t */
-        bool on = show && i * 1000 <= t_pm * (n - 1);
-        bool major = g->cfg.tick_major_every == 0 || i % g->cfg.tick_major_every == 0;
-        int opa = on ? g->cfg.tick_on_opa_pct : g->cfg.tick_off_opa_pct;
-        if (!major) opa = opa * UIG_TICK_MINOR_OPA_PCT / 100;    /* minor ticks are thinner (0.6) */
-        lv_obj_set_style_line_color(g->ticks[i], on ? g->cfg.tick_on_color : TH_DIM, 0);
-        lv_obj_set_style_line_opa(g->ticks[i], TH_OPA_PCT(opa), 0);
-    }
 }
 
 void gauge_set_marker(gauge_t *g, bool show, int t_pm)

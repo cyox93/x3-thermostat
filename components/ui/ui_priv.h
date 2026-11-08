@@ -21,24 +21,15 @@ void ui_tight_label_set_text(lv_obj_t *label, const char *text);
 void ui_fmt_x10(char *buf, size_t len, int v_x10);
 void ui_show(lv_obj_t *obj, bool show);
 
-/* widget_gauge.c — arc track + value arc + ticks + current marker */
-typedef struct {
-    uint8_t tick_count;             /* 0 = none */
-    uint8_t tick_major_every;       /* 0 = all ticks major */
-    int16_t tick_r_in, tick_r_out_major, tick_r_out_minor;
-    lv_color_t tick_on_color;
-    uint8_t tick_on_opa_pct, tick_off_opa_pct;
-    uint8_t tick_w;                 /* 0 = UIG_TICK_W */
-    bool marker;
-} gauge_cfg_t;
+/* widget_gauge.c — arc track + value arc + optional current marker */
 typedef struct gauge gauge_t;
-gauge_t *gauge_create(lv_obj_t *parent, const gauge_cfg_t *cfg);
-/* t_pm = 0..1000 along the sweep. show=false hides the value arc and dims all ticks */
+gauge_t *gauge_create(lv_obj_t *parent, bool marker);
+/* t_pm = 0..1000 along the sweep. show=false hides the value arc */
 void gauge_set_value(gauge_t *g, bool show, int t_pm);
 void gauge_set_marker(gauge_t *g, bool show, int t_pm);
 
 /* widget_flame.c */
-typedef enum { FLAME_COLOR_14, FLAME_COLOR_10, FLAME_MONO_10, FLAME_MONO_9 } flame_kind_t;
+typedef enum { FLAME_COLOR_14, FLAME_COLOR_10, FLAME_MONO_14, FLAME_MONO_10, FLAME_MONO_9 } flame_kind_t;
 lv_obj_t *flame_create(lv_obj_t *parent, flame_kind_t kind);
 void flame_set_color(lv_obj_t *flame, lv_color_t c);     /* mono kinds only */
 

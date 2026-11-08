@@ -1,7 +1,7 @@
 /*******************************************************************************
  * Size: 28 px
  * Bpp: 4
- * Opts: --font src/InterTight-ExtraLight.ttf --size 28 --bpp 4 --format lvgl --no-compress --symbols ° --lv-font-name font_inter200_28 -o ../../components/ui/fonts/font_inter200_28.c
+ * Opts: --font src/InterTight-Light.ttf --size 28 --bpp 4 --format lvgl --no-compress --symbols ° --lv-font-name font_inter300_28 -o ../../components/ui/fonts/font_inter300_28.c
  ******************************************************************************/
 
 #ifdef LV_LVGL_H_INCLUDE_SIMPLE
@@ -10,11 +10,11 @@
 #include "lvgl/lvgl.h"
 #endif
 
-#ifndef FONT_INTER200_28
-#define FONT_INTER200_28 1
+#ifndef FONT_INTER300_28
+#define FONT_INTER300_28 1
 #endif
 
-#if FONT_INTER200_28
+#if FONT_INTER300_28
 
 /*-----------------
  *    BITMAPS
@@ -23,13 +23,12 @@
 /*Store the image of the glyphs*/
 static LV_ATTRIBUTE_LARGE_CONST const uint8_t glyph_bitmap[] = {
     /* U+00B0 "°" */
-    0x0, 0x19, 0xef, 0xb3, 0x0, 0x1, 0xea, 0x33,
-    0x7f, 0x40, 0xa, 0xa0, 0x0, 0x5, 0xe0, 0xf,
-    0x20, 0x0, 0x0, 0xd4, 0x2f, 0x0, 0x0, 0x0,
-    0xa6, 0xf, 0x10, 0x0, 0x0, 0xc5, 0xc, 0x80,
-    0x0, 0x3, 0xf1, 0x3, 0xf7, 0x10, 0x5e, 0x70,
-    0x0, 0x3c, 0xff, 0xe6, 0x0, 0x0, 0x0, 0x12,
-    0x0, 0x0
+    0x0, 0x3b, 0xff, 0xb2, 0x0, 0x5, 0xfe, 0xaa,
+    0xff, 0x30, 0x1f, 0xc1, 0x0, 0x2e, 0xd0, 0x6f,
+    0x30, 0x0, 0x6, 0xf3, 0x7f, 0x0, 0x0, 0x3,
+    0xf5, 0x6f, 0x30, 0x0, 0x6, 0xf3, 0x1f, 0xc1,
+    0x0, 0x2e, 0xd0, 0x5, 0xfe, 0xaa, 0xff, 0x30,
+    0x0, 0x4b, 0xff, 0xb2, 0x0
 };
 
 
@@ -39,7 +38,7 @@ static LV_ATTRIBUTE_LARGE_CONST const uint8_t glyph_bitmap[] = {
 
 static const lv_font_fmt_txt_glyph_dsc_t glyph_dsc[] = {
     {.bitmap_index = 0, .adv_w = 0, .box_w = 0, .box_h = 0, .ofs_x = 0, .ofs_y = 0} /* id = 0 reserved */,
-    {.bitmap_index = 0, .adv_w = 196, .box_w = 10, .box_h = 10, .ofs_x = 1, .ofs_y = 12}
+    {.bitmap_index = 0, .adv_w = 189, .box_w = 10, .box_h = 9, .ofs_x = 1, .ofs_y = 12}
 };
 
 /*---------------------
@@ -95,9 +94,9 @@ static lv_font_fmt_txt_dsc_t font_dsc = {
 
 /*Initialize a public general font descriptor*/
 #if LVGL_VERSION_MAJOR >= 8
-const lv_font_t font_inter200_28 = {
+const lv_font_t font_inter300_28 = {
 #else
-lv_font_t font_inter200_28 = {
+lv_font_t font_inter300_28 = {
 #endif
     .get_glyph_dsc = lv_font_get_glyph_dsc_fmt_txt,    /*Function pointer to get glyph's data*/
     .get_glyph_bitmap = lv_font_get_bitmap_fmt_txt,    /*Function pointer to get glyph's bitmap*/
@@ -119,5 +118,5 @@ lv_font_t font_inter200_28 = {
 
 
 
-#endif /*#if FONT_INTER200_28*/
+#endif /*#if FONT_INTER300_28*/
 

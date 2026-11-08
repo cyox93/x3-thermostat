@@ -26,7 +26,7 @@ lv_obj_t *summary_create(lv_obj_t *parent)
         lv_obj_set_size(slot, UIG_SUMMARY_FLAME_W, UIG_SUMMARY_FLAME_H);
         lv_obj_center(flame_create(slot, FLAME_MONO_9));
 
-        lv_obj_t *letter = ui_tight_label_dy(cell, &font_pret500_12, TH_GRAY_OFF, 0, UIG_SUMMARY_TEXT_H,
+        lv_obj_t *letter = ui_tight_label_dy(cell, &font_pret600_12, TH_GRAY_OFF, 0, UIG_SUMMARY_TEXT_H,
                                              UIG_SUMMARY_TEXT_DY);
         ui_tight_label_set_text(letter, letters[i]);
     }

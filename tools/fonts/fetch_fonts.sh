@@ -18,7 +18,7 @@ PY=${IDF_PYTHON_ENV_PATH:-$HOME/.espressif/tools/python/v6.0/venv}/bin/python
 "$PY" - <<'PY'
 from fontTools.ttLib import TTFont
 from fontTools.varLib.instancer import instantiateVariableFont
-instantiateVariableFont(TTFont('InterTight-VF.ttf'), {'wght': 200}).save('InterTight-ExtraLight.ttf')
+instantiateVariableFont(TTFont('InterTight-VF.ttf'), {'wght': 300}).save('InterTight-Light.ttf')
 instantiateVariableFont(TTFont('JetBrainsMono-VF.ttf'), {'wght': 400}).save('JetBrainsMono-Regular.ttf')
 PY
 ls -1

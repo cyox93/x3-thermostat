@@ -39,8 +39,8 @@ lv_obj_t *badge_create(lv_obj_t *parent)
     lv_obj_t *lit = flame_create(row, FLAME_COLOR_10);  /* child 0: burning, flickers */
     lv_image_set_pivot(lit, img_flame_color_10.header.w / 2, img_flame_color_10.header.h);
     lv_obj_t *idle = flame_create(row, FLAME_MONO_10);  /* child 1: idle, still */
-    flame_set_color(idle, TH_GRAY_OFF);
-    lv_obj_t *label = ui_label(row, &font_pret500_12, TH_BADGE_OFF, 0);
+    flame_set_color(idle, TH_BADGE_OFF_FLAME);
+    lv_obj_t *label = ui_label(row, &font_pret600_12, TH_BADGE_OFF, 0);
     lv_label_set_text(label, "보일러");
     lv_obj_align(row, LV_ALIGN_TOP_MID, 0, UIG_BADGE_TOP);
     return row;

@@ -23,23 +23,23 @@ conv() {   # conv <font file> <size> <name> <symbols> [fallback]
 }
 
 echo "Pretendard"
-for sz in 12 13 14 15 17 18 20; do
+for sz in 13 17 18 20 21; do
   conv "$SRC/Pretendard-Medium.otf" $sz font_pret500_$sz "$KO$PRET_LATIN"
 done
 for sz in 17 23 26; do
   conv "$SRC/Pretendard-Regular.otf" $sz font_pret400_$sz "$KO$PRET_LATIN"
 done
-for sz in 23 26 32; do
+for sz in 12 23 26 32; do
   conv "$SRC/Pretendard-SemiBold.otf" $sz font_pret600_$sz "$KO$PRET_LATIN"
 done
 conv "$SRC/Pretendard-Medium.otf" 64 font_pret500_64 "분초"
 
-echo "Inter Tight 200"
-conv "$SRC/InterTight-ExtraLight.ttf" 24 font_inter200_24 "%"
-conv "$SRC/InterTight-ExtraLight.ttf" 28 font_inter200_28 "°"
-conv "$SRC/InterTight-ExtraLight.ttf" 60 font_inter200_60 "OFN"
-conv "$SRC/InterTight-ExtraLight.ttf" 64 font_inter200_64 "0123456789." font_pret500_64
-conv "$SRC/InterTight-ExtraLight.ttf" 72 font_inter200_72 "0123456789"
+echo "Inter Tight 300"
+conv "$SRC/InterTight-Light.ttf" 24 font_inter300_24 "%"
+conv "$SRC/InterTight-Light.ttf" 28 font_inter300_28 "°"
+conv "$SRC/InterTight-Light.ttf" 60 font_inter300_60 "OFN"
+conv "$SRC/InterTight-Light.ttf" 64 font_inter300_64 "0123456789." font_pret500_64
+conv "$SRC/InterTight-Light.ttf" 72 font_inter300_72 "0123456789"
 
 echo "JetBrains Mono 400"
 conv "$SRC/JetBrainsMono-Regular.ttf" 17 font_jb400_17 "0123456789%" font_pret400_17

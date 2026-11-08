@@ -19,14 +19,15 @@ const flame = (w, h, mono) => `<svg xmlns="http://www.w3.org/2000/svg" width="${
 const wifi = (level) => {
   const arcs = [3, 2, 1].map((_, i) => {
     const r = 3 + i * 2, active = level >= 3 - i;
-    return `<path d="M ${6.5 - r} 10 A ${r} ${r} 0 0 1 ${6.5 + r} 10" fill="none" stroke="${active ? '#f5f3ee' : '#7a7a80'}" stroke-width="1.2" opacity="${active ? 0.9 : 0.3}"/>`;
+    return `<path d="M ${6.5 - r} 10 A ${r} ${r} 0 0 1 ${6.5 + r} 10" fill="none" stroke="${active ? '#ffffff' : '#d0d0d4'}" stroke-width="1.2" opacity="${active ? 0.9 : 0.3}"/>`;
   }).join('');
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="12" viewBox="0 0 13 11" style="display:block">${arcs}<circle cx="6.5" cy="10" r="0.9" fill="#f5f3ee"/></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="12" viewBox="0 0 13 11" style="display:block">${arcs}<circle cx="6.5" cy="10" r="0.9" fill="#ffffff"/></svg>`;
 };
 
 const ICONS = [
   { name: 'img_flame_color_14', w: 14, h: 18, svg: flame(14, 18), cf: 'ARGB8888' },
   { name: 'img_flame_color_10', w: 10, h: 13, svg: flame(10, 13), cf: 'ARGB8888' },
+  { name: 'img_flame_mono_14',  w: 14, h: 18, svg: flame(14, 18, true), cf: 'A8' },
   { name: 'img_flame_mono_10',  w: 10, h: 13, svg: flame(10, 13, true), cf: 'A8' },
   { name: 'img_flame_mono_9',   w: 9,  h: 11, svg: flame(9, 11, true),  cf: 'A8' },
   ...[0, 1, 2, 3].map(l => ({ name: `img_wifi_${l}`, w: 14, h: 12, svg: wifi(l), cf: 'ARGB8888' })),

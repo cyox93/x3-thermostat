@@ -210,11 +210,12 @@ UI가 소유한 출력은 UI의 명령으로만 바꾼다 (`architecture.md` §3
 |---|---|
 | 화면 전환 | 화면 객체 4개 (MAIN · SETTINGS · EDIT_ROOM · EDIT_VALUE) + `lv_screen_load`. 화면밝기 · 화면시간은 EDIT_VALUE 하나가 모드로 나눈다 |
 | 원호 게이지 | 트랙 · 값 `lv_arc` (노브 숨김), 디자인 각 −130°~+130° → LVGL `bg_angles(140, 40)` |
-| 눈금 · 현재온도 마커 | `lv_line`, 점은 `ui_geometry.h` 값으로 미리 계산 |
+| 현재온도 마커 | `lv_line` (두께 4, 둥근 끝, 반지름 91→109로 원호를 가로지름), 점은 `ui_geometry.h` 값으로 미리 계산. 눈금은 디자인 v2에서 없앴다 — 반지름 ~110 바깥은 X3 창 베젤에 가려진다 |
 | 슬롯 목록 (설정 · 방 선택) | `widget_focus_list` — 거리 0/1/2+ → 크기 1.0/0.74/0.55, 투명도 1.0/0.45/0.18, 300 ms ease-out |
-| 불꽃 | `design/tools/build-icons.mjs`가 Chrome으로 SVG를 그려 C 배열로 만든다. 크기는 정수로 올림: 14×18 · 10×13 · 9×11. 컬러(14 · 10)는 ARGB8888 한 장, 단색(10 · 9)은 A8 + `image_recolor`. 배지 애니메이션은 `lv_image_set_scale_x/y`로 근사 |
+| 불꽃 | `design/tools/build-icons.mjs`가 Chrome으로 SVG를 그려 C 배열로 만든다. 크기는 정수로 올림: 14×18 · 10×13 · 9×11. 컬러(14 · 10)는 ARGB8888 한 장, 단색(14 · 10 · 9)은 A8 + `image_recolor`. 방 이름 앞 불꽃은 늘 보이고 컬러(연소) · 단색 `#6E6E75`(그 밖)을 바꾼다. 애니메이션은 `lv_image_set_scale_x/y`로 근사 |
 | 방 요약 줄 | 칸마다 불꽃 자리를 항상 잡고 아이콘만 숨긴다 (글자가 움직이지 않게) |
 | 누름 플래시 | `lv_layer_top()` 오버레이 하나. 그라데이션 대신 단색 반투명 원, 세리프 이탤릭 대신 Pretendard 600 32 px. 투명도 0→1 (150 ms) → 0 (450 ms) |
+| MAIN 값 자리 | 높이 66 고정 컨테이너에 희망온도 줄과 `OFF`를 두고 `HIDDEN`만 바꾼다 — ON/OFF 전환에 다른 요소가 움직이지 않는다 |
 | WiFi 상태바 | golden과 같이 아이콘 + `3/3` (레벨 0이면 `OFF`). 아이콘은 레벨별 ARGB8888 4장 (호마다 색 · 투명도가 달라 recolor로는 안 된다). 레벨은 `app_state` 값 |
 
 ### 4.1 폰트
@@ -336,8 +337,12 @@ UI가 소유한 출력은 UI의 명령으로만 바꾼다 (`architecture.md` §3
 
 **한도 3.5%의 근거 (2026-10-28, sim).** 29장 중 16장은 2% 아래, 13장(편집 화면 · 마스터 MAIN ·
 방 선택 1장)이 2.1~3.11%였다. 13장 모두 요소 위치는 1~3 px 안이고 빨간 곳은 글자 획을 따라서만 나온다 —
-Chrome이 Inter Tight 200 · Pretendard 획을 더 굵게 그린다. 글리프 알파에 감마(0.75 · 0.6)를 줘도 13장이
+Chrome이 Inter Tight · Pretendard 획을 더 굵게 그린다. 글리프 알파에 감마(0.75 · 0.6)를 줘도 13장이
 그대로 2%를 넘어 농도가 아니라 획 폭 차이로 본다. 한도를 넘는 프레임이 생기면 diff 이미지부터 본다.
+
+**디자인 v2 (2026-11-08, sim).** 밝은 토큰, Inter Tight 300, 두꺼운 원호(7 · 8), 눈금 삭제, 방 이름 앞
+불꽃, 고정 높이 값 자리로 바꾼 뒤 golden을 다시 만들었다. 29장 모두 통과(최대 2.71%, 화면시간),
+`scenarios.json`은 HTML · sim 모두 통과, 단계 화면 19장 통과.
 
 **맞추면서 알게 된 것.** `lv_font_conv`는 변환한 글리프로만 줄 높이를 잡아 CSS `line-height: normal`보다
 낮다 → `tools/fonts/css_metrics.py`가 hhea 값으로 고쳐 쓴다. CSS `letter-spacing`은 마지막 글자 뒤에도
