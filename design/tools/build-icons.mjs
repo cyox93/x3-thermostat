@@ -27,8 +27,6 @@ const wifi = (level) => {
 const ICONS = [
   { name: 'img_flame_color_14', w: 14, h: 18, svg: flame(14, 18), cf: 'ARGB8888' },
   { name: 'img_flame_color_10', w: 10, h: 13, svg: flame(10, 13), cf: 'ARGB8888' },
-  { name: 'img_flame_mono_14',  w: 14, h: 18, svg: flame(14, 18, true), cf: 'A8' },
-  { name: 'img_flame_mono_10',  w: 10, h: 13, svg: flame(10, 13, true), cf: 'A8' },
   { name: 'img_flame_mono_9',   w: 9,  h: 11, svg: flame(9, 11, true),  cf: 'A8' },
   ...[0, 1, 2, 3].map(l => ({ name: `img_wifi_${l}`, w: 14, h: 12, svg: wifi(l), cf: 'ARGB8888' })),
 ];

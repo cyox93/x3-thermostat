@@ -6,7 +6,7 @@
 static struct {
     lv_obj_t *scr;
     gauge_t *gauge;
-    lv_obj_t *flame_lit, *flame_idle, *room;
+    lv_obj_t *flame, *room;
     lv_obj_t *cur_row, *cur_temp, *cur_hum;
     lv_obj_t *hero_row, *hero, *off;
     lv_obj_t *wifi;
@@ -58,15 +58,13 @@ lv_obj_t *screen_main_create(void)
     lv_obj_set_size(stack, UIG_W, UIG_H);
     s.stack = stack;
 
-    /* [flame] room — the flame is always there: colour and flickering while
-       this room burns, grey and still otherwise */
+    /* [flame] room — the flame's slot is always kept so the name never
+       moves; the flame shows (colour, flickering) only while this room burns */
     lv_obj_t *room_row = ui_box(stack, LV_FLEX_FLOW_ROW);
     lv_obj_set_style_pad_column(room_row, UIG_MAIN_ROOM_FLAME_GAP, 0);
     lv_obj_set_style_pad_bottom(room_row, UIG_MAIN_ROOM_MB, 0);
-    s.flame_lit = flame_create(room_row, FLAME_COLOR_14);
-    lv_image_set_pivot(s.flame_lit, img_flame_color_14.header.w / 2, img_flame_color_14.header.h);
-    s.flame_idle = flame_create(room_row, FLAME_MONO_14);
-    flame_set_color(s.flame_idle, TH_FLAME_IDLE);
+    s.flame = flame_create(room_row, FLAME_COLOR_14);
+    lv_image_set_pivot(s.flame, img_flame_color_14.header.w / 2, img_flame_color_14.header.h);
     s.room = ui_label(room_row, &font_pret500_20, TH_DIM, UIG_MAIN_ROOM_LS);
 
     s.cur_row = ui_box(stack, LV_FLEX_FLOW_ROW);
@@ -139,9 +137,9 @@ void screen_main_refresh(void)
     /* Colour flame only while this room's heating is on and the boiler side
        reports it burning */
     bool heating = r->on && r->burning;
-    ui_show(s.flame_lit, heating);
-    ui_show(s.flame_idle, !heating);
-    flicker(s.flame_lit, heating && ui_screens_anim());
+    /* Opacity, not HIDDEN: a hidden object leaves the flex row and the name would shift */
+    lv_obj_set_style_opa(s.flame, heating ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+    flicker(s.flame, heating && ui_screens_anim());
 
     gauge_set_value(s.gauge, r->on, target_t_pm(r->target_x10));
     gauge_set_marker(s.gauge, has_cur, has_cur ? target_t_pm(r->current_x10) : 0);

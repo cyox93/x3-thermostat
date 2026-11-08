@@ -31,15 +31,15 @@ static void flicker(lv_obj_t *img, bool on)
     lv_anim_start(&a);
 }
 
-/* "[flame] 보일러" at the top of the master's MAIN screen: lit while any room burns */
+/* "[flame] 보일러" at the top of the master's MAIN screen. The flame shows
+   (colour, flickering) only while any room burns; its slot is always kept
+   so the text never moves. */
 lv_obj_t *badge_create(lv_obj_t *parent)
 {
     lv_obj_t *row = ui_box(parent, LV_FLEX_FLOW_ROW);
     lv_obj_set_style_pad_column(row, UIG_BADGE_GAP, 0);
-    lv_obj_t *lit = flame_create(row, FLAME_COLOR_10);  /* child 0: burning, flickers */
+    lv_obj_t *lit = flame_create(row, FLAME_COLOR_10);  /* child 0 */
     lv_image_set_pivot(lit, img_flame_color_10.header.w / 2, img_flame_color_10.header.h);
-    lv_obj_t *idle = flame_create(row, FLAME_MONO_10);  /* child 1: idle, still */
-    flame_set_color(idle, TH_BADGE_OFF_FLAME);
     lv_obj_t *label = ui_label(row, &font_pret600_12, TH_BADGE_OFF, 0);
     lv_label_set_text(label, "보일러");
     lv_obj_align(row, LV_ALIGN_TOP_MID, 0, UIG_BADGE_TOP);
@@ -52,7 +52,7 @@ void badge_set(lv_obj_t *badge, bool burning)
     /* Restart only on a change, or the flicker would jump on every refresh */
     bool want = burning && ui_screens_anim();
     if (want != (lv_anim_get(lit, flicker_cb) != NULL)) flicker(lit, want);
-    lv_obj_set_hidden(lit, !burning);
-    lv_obj_set_hidden(lv_obj_get_child(badge, 1), burning);
-    lv_obj_set_style_text_color(lv_obj_get_child(badge, 2), burning ? TH_BADGE_ON : TH_BADGE_OFF, 0);
+    /* Opacity, not HIDDEN: a hidden object leaves the flex row and the text would shift */
+    lv_obj_set_style_opa(lit, burning ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+    lv_obj_set_style_text_color(lv_obj_get_child(badge, 1), burning ? TH_BADGE_ON : TH_BADGE_OFF, 0);
 }

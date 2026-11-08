@@ -29,7 +29,7 @@ void gauge_set_value(gauge_t *g, bool show, int t_pm);
 void gauge_set_marker(gauge_t *g, bool show, int t_pm);
 
 /* widget_flame.c */
-typedef enum { FLAME_COLOR_14, FLAME_COLOR_10, FLAME_MONO_14, FLAME_MONO_10, FLAME_MONO_9 } flame_kind_t;
+typedef enum { FLAME_COLOR_14, FLAME_COLOR_10, FLAME_MONO_9 } flame_kind_t;
 lv_obj_t *flame_create(lv_obj_t *parent, flame_kind_t kind);
 void flame_set_color(lv_obj_t *flame, lv_color_t c);     /* mono kinds only */
 

@@ -9,14 +9,12 @@
 #define TH_DIM           lv_color_hex(0xD0D0D4)
 #define TH_ACCENT        lv_color_hex(0xE88A5E)
 #define TH_FLAME_INNER   lv_color_hex(0xFFD27A)
-#define TH_FLAME_IDLE    lv_color_hex(0x6E6E75)     /* flame before the room name, not burning */
 #define TH_CURRENT       lv_color_hex(0x7FC8D4)
 #define TH_SETTING       lv_color_hex(0xCFCFCF)
 #define TH_GRAY_ON       lv_color_hex(0xFFFFFF)
 #define TH_GRAY_OFF      lv_color_hex(0x9A9AA0)
 #define TH_BADGE_ON      lv_color_hex(0xFFFFFF)
 #define TH_BADGE_OFF     lv_color_hex(0xA8A8AE)
-#define TH_BADGE_OFF_FLAME lv_color_hex(0x8E8E95)
 
 #define TH_OPA_PCT(p)    ((lv_opa_t)((p) * 255 / 100))
 
@@ -43,8 +41,6 @@ LV_FONT_DECLARE(font_jb400_9)
 
 LV_IMAGE_DECLARE(img_flame_color_14);
 LV_IMAGE_DECLARE(img_flame_color_10);
-LV_IMAGE_DECLARE(img_flame_mono_14);
-LV_IMAGE_DECLARE(img_flame_mono_10);
 LV_IMAGE_DECLARE(img_flame_mono_9);
 LV_IMAGE_DECLARE(img_wifi_0);
 LV_IMAGE_DECLARE(img_wifi_1);
