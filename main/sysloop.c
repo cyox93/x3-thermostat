@@ -12,6 +12,7 @@
 #include "eventloop.h"
 #include "device.h"
 #include "ui.h"
+#include "app_state.h"
 
 #include "main.h"
 
@@ -20,12 +21,19 @@ static const char* TAG = "sysloop";
 /* Event ids — posted by callbacks, handled in the sysloop thread */
 #define SYSLOOP_KEY_EVENT_ID        1
 #define SYSLOOP_ENCODER_EVENT_ID    2
+#define SYSLOOP_SWITCH_READY_EVENT_ID 3
+#define SYSLOOP_ROOM_EVENT_ID       4
+
+/* Lights: K3 = L1, K4 = L2 in every room; 큰방 has a third light on K2 (L3).
+   Elsewhere K2 is the UI's ROOM key, which only the living room (master)
+   acts on. The key's LED shows its light: orange = on, white = off. */
+#define _LIGHT_MAX          3
+static const int _light_key[_LIGHT_MAX + 1] = { 0, 3, 4, 2 };    /* light → key */
 
 /* Timer ids */
 static const int SYSLOOP_ALS_TIMER_ID = 1;
 static const int SYSLOOP_TEMP_MEASURE_TIMER_ID = 2;
 static const int SYSLOOP_TEMP_GET_TIMER_ID = 3;
-static const int SYSLOOP_SCREEN_TIMER_ID = 4;
 
 /* Room light changes slowly; brightness control filters further anyway */
 #define _ALS_PERIOD_MS          1000
@@ -52,24 +60,26 @@ static const int SYSLOOP_SCREEN_TIMER_ID = 4;
 #define _BRIGHT_DARKER_HOLD_S   20
 #define _BRIGHT_BRIGHTER_HOLD_S 3
 
-/* At night the screen stays off and wakes on touch for this long */
-#define _SCREEN_WAKE_MS         (1000 * 10)
-
+/* The ambient level sets only the button LEDs; the LCD backlight belongs to
+   the UI's brightness setting (docs/ui.md §2.2) */
 typedef struct _bright_output {
-    uint8_t lcd;        /* backlight PWM duty 0~255 (LED ring is on/off only) */
     uint8_t btn_led;    /* x3-switch button LEDs, % */
-    bool screen_sleep;  /* screen off unless touched */
 } _bright_output_t;
 
 static const _bright_output_t _bright_outputs[] = {
-    [SC_BRIGHT_NIGHT]  = { .lcd = 8,   .btn_led = 3,   .screen_sleep = true  },
-    [SC_BRIGHT_DIM]    = { .lcd = 60,  .btn_led = 30,  .screen_sleep = false },
-    [SC_BRIGHT_NORMAL] = { .lcd = 255, .btn_led = 100, .screen_sleep = false },
+    [SC_BRIGHT_NIGHT]  = { .btn_led = 3   },
+    [SC_BRIGHT_DIM]    = { .btn_led = 30  },
+    [SC_BRIGHT_NORMAL] = { .btn_led = 100 },
 };
 
 static const char *_bright_names[] = { "night", "dim", "normal" };
 
 /* Key event data for eventloop posting */
+typedef struct _room_event_data {
+    int room;
+    bool heat_on;
+} _room_event_data_t;
+
 typedef struct _key_event_data {
     int ch;             /* 1..4 = K1..K4 */
     sc_switch_key_t event;
@@ -86,13 +96,13 @@ typedef struct _sysloop {
     sc_bright_level_t bright_pending;   /* candidate level while it holds */
     int bright_hold;                    /* seconds the candidate has held */
     int bright_force;                   /* -1 = auto, else forced level */
-    bool screen_woken;                  /* woken by touch at night */
+    int room;                           /* installed room (app_room_t), from the UI */
+    bool heat_on;                       /* heating in the room on screen, from the UI */
 } _sysloop_t;
 
 static _sysloop_t *_sysloop;
 
 /* Forward declarations */
-static void _screen_touch(void);
 
 /* ========== Driver callbacks — hand off to the sysloop thread ========== */
 
@@ -120,19 +130,99 @@ static void _encoder_driver_cb(int dir, void *arg)
     sc_eventloop_post_event_from_isr(_sysloop->loop, SYSLOOP_ENCODER_EVENT_ID, &dir, sizeof(dir));
 }
 
+/**
+ * Switch ready callback - runs in the switchloop thread
+ */
+/**
+ * UI room callback - runs in the LVGL task
+ */
+static void _ui_room_cb(int room, bool heat_on, void *arg)
+{
+    if (!_sysloop || !_sysloop->loop) return;
+
+    _room_event_data_t d = { .room = room, .heat_on = heat_on };
+    sc_eventloop_post_event(_sysloop->loop, SYSLOOP_ROOM_EVENT_ID, &d, sizeof(d));
+}
+
+static void _switch_ready_cb(void *arg)
+{
+    if (!_sysloop || !_sysloop->loop) return;
+
+    sc_eventloop_post_event(_sysloop->loop, SYSLOOP_SWITCH_READY_EVENT_ID, NULL, 0);
+}
+
 /* ========== Event handlers — run in the sysloop thread ========== */
+
+static int _light_num(void)
+{
+    return _sysloop->room == APP_ROOM_BIG ? 3 : 2;
+}
+
+static int _light_of_key(int key)
+{
+    for (int light = 1; light <= _light_num(); light++) {
+        if (_light_key[light] == key) return light;
+    }
+    return 0;
+}
+
+static void _light_led_apply(int light)
+{
+    bool on = sc_switch_relay_get(light);
+    sc_switch_led_set(_light_key[light], on ? SC_X3SWITCH_LED_ORANGE : SC_X3SWITCH_LED_WHITE);
+}
+
+/* K1 switches heating: its LED shows it, orange = on, white = off. K2 is a
+   light in 큰방, the ROOM key (orange) in the living room, and white where
+   it does nothing. */
+static void _key_leds_apply(void)
+{
+    sc_switch_led_set(1, _sysloop->heat_on ? SC_X3SWITCH_LED_ORANGE : SC_X3SWITCH_LED_WHITE);
+    if (_sysloop->room != APP_ROOM_BIG) {
+        sc_switch_led_set(2, _sysloop->room == APP_ROOM_LIVING ? SC_X3SWITCH_LED_ORANGE : SC_X3SWITCH_LED_WHITE);
+    }
+    for (int light = 1; light <= _light_num(); light++) {
+        _light_led_apply(light);
+    }
+}
+
+static void _light_toggle(int light)
+{
+    bool on = !sc_switch_relay_get(light);
+    sc_switch_relay_set(light, on);
+    _light_led_apply(light);
+    ESP_LOGI(TAG, "light %d %s", light, on ? "on" : "off");
+}
+
+/* The board's relays were adopted (they survive an ESP32 reboot): make the
+   key LEDs show them */
+static void _switch_ready_event_handler(int id, void *arg, void *data)
+{
+    _key_leds_apply();
+}
+
+static void _room_event_handler(int id, void *arg, void *data)
+{
+    _room_event_data_t *d = (_room_event_data_t *)data;
+    int room = d->room;
+    _sysloop->room = room;
+    _sysloop->heat_on = d->heat_on;
+    if (sc_switch_is_ready()) {
+        _key_leds_apply();
+    }
+    ESP_LOGI(TAG, "room %d: %d lights, heating %s", room, _light_num(), d->heat_on ? "on" : "off");
+}
 
 static void _key_event_handler(int id, void *arg, void *data)
 {
     _key_event_data_t *key_data = (_key_event_data_t *)data;
     if (!key_data) return;
 
-    _screen_touch();
-
-    /* K1 is the push the knob lacks; K2 is the ROOM button (docs/ui.md §2.1).
-       TODO: policy — map the other keys to lights per room config */
+    /* K1 is the push the knob lacks (docs/ui.md §2.1); see _light_key */
     bool lng = key_data->event == SC_SWITCH_KEY_LONG;
+    int light = _light_of_key(key_data->ch);
     if (key_data->ch == 1) ui_input(lng ? UI_IN_LONG : UI_IN_SHORT);
+    else if (light && !lng) _light_toggle(light);
     else if (key_data->ch == 2 && !lng) ui_input(UI_IN_ROOM);
     ESP_LOGI(TAG, "K%d %s", key_data->ch, lng ? "LONG" : "CLICK");
 }
@@ -141,27 +231,11 @@ static void _encoder_event_handler(int id, void *arg, void *data)
 {
     int dir = *(int *)data;
 
-    /* TODO: at night the first detent should only wake the screen */
-    _screen_touch();
-
     ui_input(dir > 0 ? UI_IN_ENC_CW : UI_IN_ENC_CCW);
     ESP_LOGD(TAG, "encoder %s", dir > 0 ? "CW" : "CCW");
 }
 
 /* ========== Brightness ========== */
-
-static void _screen_apply(void)
-{
-    const _bright_output_t *out = &_bright_outputs[_sysloop->info.bright_level];
-    bool on = !out->screen_sleep || _sysloop->screen_woken;
-
-    if (on) {
-        sc_led_brightness(out->lcd);
-    } else {
-        sc_led_on(false);
-    }
-    _sysloop->info.screen_on = on;
-}
 
 static void _bright_set_level(sc_bright_level_t level)
 {
@@ -172,7 +246,6 @@ static void _bright_set_level(sc_bright_level_t level)
 
     _sysloop->info.bright_level = level;
     sc_switch_led_brightness(_bright_outputs[level].btn_led);
-    _screen_apply();
 }
 
 /* Target level for this reading, with hysteresis around the current one */
@@ -204,13 +277,6 @@ static void _bright_update(float lux)
         return;
     }
 
-    /* A screen woken at night lights up the sensor itself; don't let that
-       push the level up until it has gone back to sleep. */
-    if (cur == SC_BRIGHT_NIGHT && _sysloop->screen_woken) {
-        _sysloop->bright_hold = 0;
-        return;
-    }
-
     sc_bright_level_t target = _bright_target(lux, cur);
     if (target == cur) {
         _sysloop->bright_hold = 0;
@@ -227,24 +293,6 @@ static void _bright_update(float lux)
         _sysloop->bright_hold = 0;
         _bright_set_level(target);
     }
-}
-
-static void _screen_sleep_cb(int id, void *arg, void *data)
-{
-    _sysloop->screen_woken = false;
-    _screen_apply();
-}
-
-/* Any key or knob input: at night, light the screen briefly */
-static void _screen_touch(void)
-{
-    if (!_bright_outputs[_sysloop->info.bright_level].screen_sleep) return;
-
-    if (!_sysloop->screen_woken) {
-        _sysloop->screen_woken = true;
-        _screen_apply();
-    }
-    sc_eventloop_add_timer(_sysloop->loop, SYSLOOP_SCREEN_TIMER_ID, _screen_sleep_cb, NULL, _SCREEN_WAKE_MS, false);
 }
 
 /* ========== Periodic sensors ========== */
@@ -372,7 +420,7 @@ static void _sysloop_cmd_init(void)
     _bright_args.mode = arg_str0(NULL, NULL, "<auto|night|dim|normal>", "force a level (bench, no sensor)");
     _bright_args.end = arg_end(1);
     ESP_ERROR_CHECK(esp_console_cmd_register(&(esp_console_cmd_t){
-        .command = "bright", .help = "Show or force the display brightness level",
+        .command = "bright", .help = "Show or force the ambient brightness level (button LEDs)",
         .func = &_bright_cmd, .argtable = &_bright_args,
     }));
 
@@ -430,11 +478,15 @@ esp_err_t sc_sysloop_init(void)
     /* Register handlers before the driver callbacks can post */
     sc_eventloop_add_event(_sysloop->loop, SYSLOOP_KEY_EVENT_ID, _key_event_handler, NULL);
     sc_eventloop_add_event(_sysloop->loop, SYSLOOP_ENCODER_EVENT_ID, _encoder_event_handler, NULL);
+    sc_eventloop_add_event(_sysloop->loop, SYSLOOP_SWITCH_READY_EVENT_ID, _switch_ready_event_handler, NULL);
+    sc_eventloop_add_event(_sysloop->loop, SYSLOOP_ROOM_EVENT_ID, _room_event_handler, NULL);
 
     sc_eventloop_add_timer(_sysloop->loop, SYSLOOP_ALS_TIMER_ID, _sysloop_als_cb, NULL, _ALS_PERIOD_MS, true);
     sc_eventloop_add_timer(_sysloop->loop, SYSLOOP_TEMP_MEASURE_TIMER_ID, _sysloop_temp_measure_cb, NULL, _TEMP_PERIOD_MS, true);
 
     sc_switchloop_register_key_callback(_switch_key_cb, NULL);
+    sc_switchloop_register_ready_callback(_switch_ready_cb, NULL);
+    ui_register_room_callback(_ui_room_cb, NULL);
     sc_encoder_register_callback(_encoder_driver_cb, NULL);
 
     _sysloop_cmd_init();
@@ -450,6 +502,8 @@ _err:
 void sc_sysloop_end(void)
 {
     sc_switchloop_register_key_callback(NULL, NULL);
+    sc_switchloop_register_ready_callback(NULL, NULL);
+    ui_register_room_callback(NULL, NULL);
     sc_encoder_register_callback(NULL, NULL);
     _sysloop_destroy();
 }
