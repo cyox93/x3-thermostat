@@ -64,6 +64,8 @@ typedef struct _switchloop {
     bool key_long[_CH_NUM];
     sc_switch_key_callback_t key_cb;
     void *key_cb_arg;
+    sc_switch_ready_callback_t ready_cb;
+    void *ready_cb_arg;
 } _switchloop_t;
 
 static _switchloop_t *_switchloop;
@@ -139,6 +141,10 @@ static void _switchloop_apply(void)
         if (!_switchloop_adopt()) goto _timeout;
         _switchloop->adopted = true;
         valid = true;
+        /* Owners of the outputs may now read the adopted state and act on it */
+        if (_switchloop->ready_cb) {
+            _switchloop->ready_cb(_switchloop->ready_cb_arg);
+        }
     }
 
     xSemaphoreTake(_switchloop->mutex, portMAX_DELAY);
@@ -332,6 +338,15 @@ esp_err_t sc_switch_led_brightness(uint8_t percent)
     return _switch_update(_set_led_bri, 0, percent);
 }
 
+bool sc_switch_relay_get(int ch)
+{
+    if (!_switchloop || ch < 1 || ch > _CH_NUM) return false;
+    xSemaphoreTake(_switchloop->mutex, portMAX_DELAY);
+    bool on = _switchloop->want.relay[ch - 1];
+    xSemaphoreGive(_switchloop->mutex);
+    return on;
+}
+
 bool sc_switch_is_ready(void)
 {
     return _switchloop && _switchloop->ready;
@@ -342,6 +357,19 @@ esp_err_t sc_switchloop_register_key_callback(sc_switch_key_callback_t callback,
     _CHECK_INIT();
     _switchloop->key_cb_arg = arg;
     _switchloop->key_cb = callback;
+    return ESP_OK;
+}
+
+esp_err_t sc_switchloop_register_ready_callback(sc_switch_ready_callback_t callback, void *arg)
+{
+    _CHECK_INIT();
+    _switchloop->ready_cb_arg = arg;
+    _switchloop->ready_cb = callback;
+    /* Adoption may already be done (it starts as soon as the loop runs);
+       the callback only posts, so calling it from here is fine */
+    if (callback && _switchloop->adopted) {
+        callback(arg);
+    }
     return ESP_OK;
 }
 

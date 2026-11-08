@@ -28,7 +28,13 @@ typedef void (*sc_switch_key_callback_t)(int ch, sc_switch_key_t event, void *ar
 esp_err_t sc_switchloop_init(void);
 void sc_switchloop_end(void);
 esp_err_t sc_switchloop_register_key_callback(sc_switch_key_callback_t callback, void *arg);
+/* Runs in the switchloop thread, once, after the board's outputs have been
+   adopted at boot — sc_switch_relay_get() then reflects the board. */
+typedef void (*sc_switch_ready_callback_t)(void *arg);
+esp_err_t sc_switchloop_register_ready_callback(sc_switch_ready_callback_t callback, void *arg);
 bool sc_switch_is_ready(void);
+/* The wanted relay state (what switchloop drives the board to) */
+bool sc_switch_relay_get(int ch);
 
 esp_err_t sc_switch_relay_set(int ch, bool on);
 esp_err_t sc_switch_led_set(int ch, sc_x3switch_led_t mode);
