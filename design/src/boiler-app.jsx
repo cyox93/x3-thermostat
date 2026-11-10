@@ -68,6 +68,24 @@ function StatusBar({ wifi }) {
 }
 
 // ─── MAIN: temperature dial ──────────────────────────────────
+// Reading icons on the current line: single colour, the text's colour, 15 px tall
+// Thermometer: Material Design Icons "thermometer" (Pictogrammers, Apache-2.0)
+function ThermoIcon({ color }) {
+  return (
+    <svg width="8" height="15" viewBox="6.67 2 10.67 20" style={{ display: 'block' }}>
+      <path d="M15 13V5A3 3 0 0 0 9 5V13A5 5 0 1 0 15 13M12 4A1 1 0 0 1 13 5V8H11V5A1 1 0 0 1 12 4Z" fill={color} />
+    </svg>
+  );
+}
+
+function DropIcon({ color }) {
+  return (
+    <svg width="11" height="15" viewBox="0 0 12 16" style={{ display: 'block' }}>
+      <path d="M6 0.6C6 0.6 0.9 6.6 0.9 10.6A5.1 5.1 0 0 0 11.1 10.6C11.1 6.6 6 0.6 6 0.6Z" fill={color} />
+    </svg>
+  );
+}
+
 function FlameIcon({ size = 16, color, still = false }) {
   return (
     <svg width={size} height={size * 1.25} viewBox="0 0 16 20" style={{ display: 'block', animation: still ? 'none' : 'qa-flame 1.4s ease-in-out infinite', transformOrigin: '50% 100%' }}>
@@ -148,8 +166,9 @@ function ScreenBoiler({ roomName, currentTemp, humidity = null, state, burning =
           <div style={{ display: 'flex', visibility: heating ? 'visible' : 'hidden' }}><FlameIcon size={14} still={!heating} /></div>
           {roomName}
         </div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, whiteSpace: 'nowrap', fontFamily: 'Pretendard', fontSize: 21, fontWeight: 500, letterSpacing: '0.02em', color: QA.dim, marginBottom: 4 }}>
-          <span>현재 {currentTemp.toFixed(1)}°</span>{humidity != null && <span>{Math.round(humidity)}%</span>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, whiteSpace: 'nowrap', fontFamily: 'Pretendard', fontSize: 21, fontWeight: 500, letterSpacing: '0.02em', color: QA.dim, marginBottom: 4 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><ThermoIcon color={QA.dim} />{currentTemp.toFixed(1)}°</span>
+          {humidity != null && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><DropIcon color={QA.dim} />{Math.round(humidity)}%</span>}
         </div>
         {/* fixed-height slot: ON/OFF swaps only this content, nothing else moves */}
         <div style={{ height: 66, marginTop: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

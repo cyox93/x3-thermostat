@@ -24,7 +24,15 @@ const wifi = (level) => {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="12" viewBox="0 0 13 11" style="display:block">${arcs}<circle cx="6.5" cy="10" r="0.9" fill="#ffffff"/></svg>`;
 };
 
+// ThermoIcon / DropIcon of boiler-app.jsx, white so A8 alpha carries the shape
+const thermo = `<svg xmlns="http://www.w3.org/2000/svg" width="8" height="15" viewBox="6.67 2 10.67 20" style="display:block">` +
+  `<path d="M15 13V5A3 3 0 0 0 9 5V13A5 5 0 1 0 15 13M12 4A1 1 0 0 1 13 5V8H11V5A1 1 0 0 1 12 4Z" fill="#ffffff"/></svg>`;
+const drop = `<svg xmlns="http://www.w3.org/2000/svg" width="11" height="15" viewBox="0 0 12 16" style="display:block">` +
+  `<path d="M6 0.6C6 0.6 0.9 6.6 0.9 10.6A5.1 5.1 0 0 0 11.1 10.6C11.1 6.6 6 0.6 6 0.6Z" fill="#ffffff"/></svg>`;
+
 const ICONS = [
+  { name: 'img_icon_thermo', w: 8,  h: 15, svg: thermo, cf: 'A8' },
+  { name: 'img_icon_drop',   w: 11, h: 15, svg: drop,   cf: 'A8' },
   { name: 'img_flame_color_14', w: 14, h: 18, svg: flame(14, 18), cf: 'ARGB8888' },
   { name: 'img_flame_color_10', w: 10, h: 13, svg: flame(10, 13), cf: 'ARGB8888' },
   { name: 'img_flame_mono_9',   w: 9,  h: 11, svg: flame(9, 11, true),  cf: 'A8' },

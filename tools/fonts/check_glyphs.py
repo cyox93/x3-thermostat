@@ -11,7 +11,7 @@ USES = {  # font → strings drawn with it (docs/ui.md §4, design/README.md)
     'font_pret500_17': '돌려 선택 · 눌러 확인',
     'font_pret500_18': '설정 방 선택',
     'font_pret500_20': ROOMS + ' 화면밝기 화면시간',
-    'font_pret500_21': '현재 -0123456789.° %',
+    'font_pret500_21': '-0123456789.° %',
     'font_pret400_17': ROOMS,               # fallback of font_jb400_17
     'font_pret400_23': '방선택 화면밝기 화면시간 이전',
     'font_pret600_12': '보일러 거큰작일',

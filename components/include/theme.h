@@ -42,6 +42,8 @@ LV_FONT_DECLARE(font_jb400_9)
 LV_IMAGE_DECLARE(img_flame_color_14);
 LV_IMAGE_DECLARE(img_flame_color_10);
 LV_IMAGE_DECLARE(img_flame_mono_9);
+LV_IMAGE_DECLARE(img_icon_thermo);
+LV_IMAGE_DECLARE(img_icon_drop);
 LV_IMAGE_DECLARE(img_wifi_0);
 LV_IMAGE_DECLARE(img_wifi_1);
 LV_IMAGE_DECLARE(img_wifi_2);

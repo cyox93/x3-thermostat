@@ -34,6 +34,7 @@
 #define UIG_MAIN_CUR_MB       4
 #define UIG_MAIN_CUR_GAP      10
 #define UIG_MAIN_CUR_LS       0       /* 0.02em × 21 = 0.42 */
+#define UIG_MAIN_ICON_GAP     4       /* [thermometer] 21.4°  [drop] 45% */
 #define UIG_MAIN_SLOT_MT      2       /* fixed-height value slot: ON/OFF swap moves nothing else */
 #define UIG_MAIN_SLOT_H       66
 #define UIG_MAIN_HERO_H       64      /* line-height 1 */

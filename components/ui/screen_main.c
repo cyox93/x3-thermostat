@@ -7,7 +7,7 @@ static struct {
     lv_obj_t *scr;
     gauge_t *gauge;
     lv_obj_t *flame, *room;
-    lv_obj_t *cur_row, *cur_temp, *cur_hum;
+    lv_obj_t *cur_row, *cur_temp, *cur_hum, *hum_box;
     lv_obj_t *hero_row, *hero, *off;
     lv_obj_t *wifi;
     lv_obj_t *stack, *badge, *summary;
@@ -70,8 +70,25 @@ lv_obj_t *screen_main_create(void)
     s.cur_row = ui_box(stack, LV_FLEX_FLOW_ROW);
     lv_obj_set_style_pad_column(s.cur_row, UIG_MAIN_CUR_GAP, 0);
     lv_obj_set_style_pad_bottom(s.cur_row, UIG_MAIN_CUR_MB, 0);
-    s.cur_temp = ui_label(s.cur_row, &font_pret500_21, TH_DIM, UIG_MAIN_CUR_LS);
-    s.cur_hum = ui_label(s.cur_row, &font_pret500_21, TH_DIM, UIG_MAIN_CUR_LS);
+    lv_obj_set_flex_align(s.cur_row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    /* [icon] value, twice: the icons say "measured", no "현재" label */
+    lv_obj_t *temp_box = ui_box(s.cur_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(temp_box, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(temp_box, UIG_MAIN_ICON_GAP, 0);
+    lv_obj_t *thermo = lv_image_create(temp_box);
+    lv_image_set_src(thermo, &img_icon_thermo);
+    lv_obj_set_style_image_recolor(thermo, TH_DIM, 0);
+    lv_obj_set_style_image_recolor_opa(thermo, LV_OPA_COVER, 0);
+    s.cur_temp = ui_label(temp_box, &font_pret500_21, TH_DIM, UIG_MAIN_CUR_LS);
+
+    s.hum_box = ui_box(s.cur_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(s.hum_box, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(s.hum_box, UIG_MAIN_ICON_GAP, 0);
+    lv_obj_t *drop = lv_image_create(s.hum_box);
+    lv_image_set_src(drop, &img_icon_drop);
+    lv_obj_set_style_image_recolor(drop, TH_DIM, 0);
+    lv_obj_set_style_image_recolor_opa(drop, LV_OPA_COVER, 0);
+    s.cur_hum = ui_label(s.hum_box, &font_pret500_21, TH_DIM, UIG_MAIN_CUR_LS);
 
     /* Fixed-height slot: ON/OFF swaps only its content, so nothing else moves */
     lv_obj_t *slot = lv_obj_create(stack);
@@ -119,13 +136,13 @@ void screen_main_refresh(void)
     if (has_cur) {
         char t[12];
         ui_fmt_x10(t, sizeof(t), r->current_x10);
-        snprintf(buf, sizeof(buf), "현재 %s°", t);
+        snprintf(buf, sizeof(buf), "%s°", t);
         lv_label_set_text(s.cur_temp, buf);
     } else {
-        lv_label_set_text(s.cur_temp, "현재 --°");
+        lv_label_set_text(s.cur_temp, "--°");
     }
     bool has_hum = own && r->humidity != APP_HUM_NONE;
-    ui_show(s.cur_hum, has_hum || (own && !has_cur));
+    ui_show(s.hum_box, has_hum || (own && !has_cur));
     if (has_hum) lv_label_set_text_fmt(s.cur_hum, "%d%%", r->humidity);
     else lv_label_set_text(s.cur_hum, "--%");
 
