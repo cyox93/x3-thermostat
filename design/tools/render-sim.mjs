@@ -12,8 +12,8 @@ const OUT = 'out/lvgl';
 fs.mkdirSync(OUT, { recursive: true });
 
 // Same constants as design/src/golden-states.jsx
-const TEMPS = { '거실': 21.4, '큰방': 19.8, '일하는방': 20.6, '노는방': 22.1 };
-const HUMS = { '거실': 45, '큰방': 52, '일하는방': 38, '노는방': 47 };
+const TEMPS = { '거실': 21.4, '큰방': 19.8, '작은방': 22.1, '일하는방': 20.6 };
+const HUMS = { '거실': 45, '큰방': 52, '작은방': 47, '일하는방': 38 };
 const x10 = (v) => Math.round(v * 10);
 
 const send = (cmd) => new Promise((resolve, reject) => {

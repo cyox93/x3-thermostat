@@ -24,7 +24,7 @@ const VB = 240;
 const CX = 120, CY = 120;
 
 const SCREEN_TIME_STEPS = [10, 20, 30, 60, 120, 300]; // seconds
-const ROOMS = ['거실', '큰방', '일하는방', '노는방'];
+const ROOMS = ['거실', '큰방', '작은방', '일하는방'];
 
 // ─── arc helper ──────────────────────────────────────────────
 function arcPath(cx, cy, r, startDeg, endDeg) {
@@ -350,10 +350,10 @@ function App() {
     "showHumidity": true,
     "burnLiving": true,
     "burnBig": false,
-    "burnWork": false,
-    "burnPlay": false
+    "burnSmall": false,
+    "burnWork": false
   }/*EDITMODE-END*/);
-  const BURN_KEYS = { '거실': 'burnLiving', '큰방': 'burnBig', '일하는방': 'burnWork', '노는방': 'burnPlay' };
+  const BURN_KEYS = { '거실': 'burnLiving', '큰방': 'burnBig', '작은방': 'burnSmall', '일하는방': 'burnWork' };
   const burningOf = (r) => !!tweaks[BURN_KEYS[r]];
 
   // per-room boiler state (거실 unit can control every room)
@@ -377,8 +377,8 @@ function App() {
   const activeName = ROOMS[activeIdx];
   const state = roomStates[activeName];
   const setState = (fn) => setRoomStates(all => ({ ...all, [activeName]: fn(all[activeName]) }));
-  const currentTemps = { '거실': Number(tweaks.currentTemp), '큰방': 19.8, '일하는방': 20.6, '노는방': 22.1 };
-  const humidities = { '거실': Number(tweaks.humidity ?? 45), '큰방': 52, '일하는방': 38, '노는방': 47 };
+  const currentTemps = { '거실': Number(tweaks.currentTemp), '큰방': 19.8, '작은방': 22.1, '일하는방': 20.6 };
+  const humidities = { '거실': Number(tweaks.humidity ?? 45), '큰방': 52, '작은방': 47, '일하는방': 38 };
 
   const onRoomSwitch = () => {
     if (!isMaster || mode !== 'main') return;

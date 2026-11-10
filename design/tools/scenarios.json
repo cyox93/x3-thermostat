@@ -21,19 +21,19 @@
         "burning": false,
         "humidity": 52
       },
+      "작은방": {
+        "on": false,
+        "target": 22,
+        "current": 22.1,
+        "burning": false,
+        "humidity": 47
+      },
       "일하는방": {
         "on": false,
         "target": 22,
         "current": 20.6,
         "burning": false,
         "humidity": 38
-      },
-      "노는방": {
-        "on": false,
-        "target": 22,
-        "current": 22.1,
-        "burning": false,
-        "humidity": 47
       }
     }
   },
@@ -332,7 +332,7 @@
             "enc+"
           ],
           "expect": {
-            "roomEditSel": "일하는방"
+            "roomEditSel": "작은방"
           },
           "snap": "work"
         },
@@ -342,7 +342,7 @@
           ],
           "expect": {
             "mode": "settings",
-            "installedRoom": "일하는방",
+            "installedRoom": "작은방",
             "isMaster": false
           }
         },
@@ -353,7 +353,7 @@
           ],
           "expect": {
             "mode": "main",
-            "activeRoom": "일하는방"
+            "activeRoom": "작은방"
           },
           "snap": "main-nonmaster"
         },
@@ -362,7 +362,7 @@
             "room"
           ],
           "expect": {
-            "activeRoom": "일하는방"
+            "activeRoom": "작은방"
           }
         }
       ]

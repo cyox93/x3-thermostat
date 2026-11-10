@@ -82,12 +82,12 @@ static void test_settings_list(void)
     assert(ST->mode == APP_MODE_EDIT_ROOM && ST->room_edit_sel == ST->installed_room && !r.flash);
     app_input_enc(+1);
     app_input_enc(+1);
-    assert(ST->room_edit_sel == APP_ROOM_WORK);
+    assert(ST->room_edit_sel == APP_ROOM_SMALL);
     r = app_input_short();
     assert(ST->mode == APP_MODE_SETTINGS && ST->settings_sel == 0);
-    assert(ST->installed_room == APP_ROOM_WORK && ST->active_room == APP_ROOM_WORK);
+    assert(ST->installed_room == APP_ROOM_SMALL && ST->active_room == APP_ROOM_SMALL);
     assert(!app_state_is_master() && r.settings_commit);
-    flash_is(r, "일하는방", APP_ACCENT_SETTING);
+    flash_is(r, "작은방", APP_ACCENT_SETTING);
 
     app_input_enc(+1);                              /* 화면밝기 */
     app_input_short();

@@ -1,8 +1,8 @@
 // Deterministic 240×240 golden frames. ?state=<id> renders one frame at (0,0); no param = gallery.
 // Animations are disabled by golden.html CSS. Brightness is NOT applied (LVGL uses backlight PWM).
-const R = ['거실', '큰방', '일하는방', '노는방'];
-const HUMS = { '거실': 45, '큰방': 52, '일하는방': 38, '노는방': 47 };
-const TEMPS = { '거실': 21.4, '큰방': 19.8, '일하는방': 20.6, '노는방': 22.1 };
+const R = ['거실', '큰방', '작은방', '일하는방'];
+const HUMS = { '거실': 45, '큰방': 52, '작은방': 47, '일하는방': 38 };
+const TEMPS = { '거실': 21.4, '큰방': 19.8, '작은방': 22.1, '일하는방': 20.6 };
 const summary = (on, burn, ) => R.map((r, i) => ({ name: r, on: on[i], burning: burn[i] }));
 const SET = (sel, room = '거실') => ({ kind: 'settings', sel, settings: { roomName: room, brightness: 70, screenTime: 30 } });
 
@@ -12,10 +12,10 @@ const GOLDEN = [
   { id: 'main-off',           kind: 'main', room: '큰방', on: false, target: 22.0, burning: false },
   { id: 'main-on-min',        kind: 'main', room: '큰방', on: true,  target: 15.0, burning: false },
   { id: 'main-on-max',        kind: 'main', room: '큰방', on: true,  target: 30.0, burning: true },
-  { id: 'master-living-burn', kind: 'main', room: '거실', on: true,  target: 22.0, burning: true,  summary: summary([1,0,1,0], [1,0,0,0]) },
+  { id: 'master-living-burn', kind: 'main', room: '거실', on: true,  target: 22.0, burning: true,  summary: summary([1,0,0,1], [1,0,0,0]) },
   { id: 'master-idle',        kind: 'main', room: '거실', on: true,  target: 22.0, burning: false, summary: summary([1,0,0,0], [0,0,0,0]) },
-  { id: 'master-work-active', kind: 'main', room: '일하는방', on: true, target: 23.5, burning: true, summary: summary([1,1,1,1], [0,1,1,0]) },
-  { id: 'master-off',         kind: 'main', room: '노는방', on: false, target: 22.0, burning: false, summary: summary([0,0,0,0], [0,0,0,0]) },
+  { id: 'master-work-active', kind: 'main', room: '일하는방', on: true, target: 23.5, burning: true, summary: summary([1,1,1,1], [0,1,0,1]) },
+  { id: 'master-off',         kind: 'main', room: '작은방', on: false, target: 22.0, burning: false, summary: summary([0,0,0,0], [0,0,0,0]) },
   { id: 'settings-0-room',    ...SET(0) },
   { id: 'settings-1-bright',  ...SET(1) },
   { id: 'settings-2-time',    ...SET(2) },

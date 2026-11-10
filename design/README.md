@@ -40,7 +40,7 @@
 ## State Model
 ```c
 typedef enum { MODE_MAIN, MODE_SETTINGS, MODE_EDIT_ROOM, MODE_EDIT_BRIGHTNESS, MODE_EDIT_SCREENTIME } ui_mode_t;
-typedef enum { ROOM_LIVING, ROOM_BIG, ROOM_WORK, ROOM_PLAY, ROOM_COUNT } room_t; // 거실, 큰방, 일하는방, 노는방
+typedef enum { ROOM_LIVING, ROOM_BIG, ROOM_SMALL, ROOM_WORK, ROOM_COUNT } room_t; // 거실, 큰방, 작은방, 일하는방
 
 typedef struct {
   bool   on;          // 사용자가 켜고 끄는 보일러 전원
@@ -117,7 +117,7 @@ struct {
 
 **한글 글자 목록** (이것만 넣으면 됩니다):
 ```
-간거기노눌는돌러려면밝방보분선설시실이인일재전절정조초큰택하현화확
+간거기눌는돌러려면밝방보분선설시실이인일재전절정조초큰택하현화확작은
 ```
 **ASCII:** `0123456789.°%·OFN /`
 
@@ -168,7 +168,7 @@ struct {
 - 아니면: 불꽃 자리는 두고 **숨김**(방 이름 앞 불꽃과 같은 규칙) + 텍스트 `#A8A8AE`
 
 **방 요약 줄 (하단)**
-- 아래에서 **44px**, 가로 중앙, 칸 간격 **3px**. 칸 4개: 거 / 큰 / 일 / 노 (전체 폭 약 134px, 양 끝 아래 모서리가 중심에서 ~101 — 베젤 안)
+- 아래에서 **44px**, 가로 중앙, 칸 간격 **3px**. 칸 4개: 거 / 큰 / 작 / 일 (전체 폭 약 134px, 양 끝 아래 모서리가 중심에서 ~101 — 베젤 안)
 - 각 칸: padding (1, 4, 1, 2), 모서리 4, 테두리 1px
   - 테두리: `active_room`이면 `#FFFFFF`, 아니면 투명 (자리는 항상 차지)
   - 내용: `[불꽃 9×11 자리] 2px [방이름 첫 글자]`
@@ -188,7 +188,7 @@ struct {
 
 ### 5. EDIT_ROOM — 방 선택
 - 헤더 `방 선택`: 위 4번과 같은 스타일
-- 목록: 거실 / 큰방 / 일하는방 / 노는방, 가운데 정렬, 항목 높이 48
+- 목록: 거실 / 큰방 / 작은방 / 일하는방, 가운데 정렬, 항목 높이 48
   - Pretendard 26px. 활성 600 `accent`, 비활성 400 `fg`. 크기·투명도 규칙은 4번과 같음
 - 하단 힌트 `돌려 선택 · 눌러 확인`: 아래에서 **40px**, Pretendard 500 17px, `dim`
 

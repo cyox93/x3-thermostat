@@ -22,7 +22,7 @@ static void test_defaults(void)
 
 static void test_names(void)
 {
-    assert(strcmp(app_room_name(APP_ROOM_PLAY), "노는방") == 0);
+    assert(strcmp(app_room_name(APP_ROOM_SMALL), "작은방") == 0);
     assert(app_room_from_name("일하는방") == APP_ROOM_WORK);
     assert(app_room_from_name("놀이방") == -1);
     assert(strcmp(app_mode_name(APP_MODE_EDIT_SCREENTIME), "edit-screenTime") == 0);

@@ -5,7 +5,7 @@ import os
 import re
 import sys
 
-ROOMS = '거실 큰방 일하는방 노는방'
+ROOMS = '거실 큰방 작은방 일하는방'
 USES = {  # font → strings drawn with it (docs/ui.md §4, design/README.md)
     'font_pret500_13': '돌려 조절 · 눌러 확인',
     'font_pret500_17': '돌려 선택 · 눌러 확인',
@@ -14,7 +14,7 @@ USES = {  # font → strings drawn with it (docs/ui.md §4, design/README.md)
     'font_pret500_21': '현재 -0123456789.° %',
     'font_pret400_17': ROOMS,               # fallback of font_jb400_17
     'font_pret400_23': '방선택 화면밝기 화면시간 이전',
-    'font_pret600_12': '보일러 거큰일노',
+    'font_pret600_12': '보일러 거큰작일',
     'font_pret600_23': '방선택 화면밝기 화면시간 이전',
     'font_pret400_26': ROOMS,
     'font_pret600_26': ROOMS,

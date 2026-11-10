@@ -10,8 +10,8 @@
    design/src/golden-states.jsx, which render-sim.mjs repeats */
 static void reset_state(void)
 {
-    static const int16_t temps[APP_ROOM_COUNT] = { 214, 198, 206, 221 };
-    static const int8_t hums[APP_ROOM_COUNT] = { 45, 52, 38, 47 };
+    static const int16_t temps[APP_ROOM_COUNT] = { 214, 198, 221, 206 };
+    static const int8_t hums[APP_ROOM_COUNT] = { 45, 52, 47, 38 };
     app_state_init();
     for (int i = 0; i < APP_ROOM_COUNT; i++) {
         app_room_state_t rs = {

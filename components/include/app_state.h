@@ -9,8 +9,8 @@
 typedef enum {
     APP_ROOM_LIVING,        /* 거실 — installing here makes the unit the master */
     APP_ROOM_BIG,           /* 큰방 */
+    APP_ROOM_SMALL,         /* 작은방 */
     APP_ROOM_WORK,          /* 일하는방 */
-    APP_ROOM_PLAY,          /* 노는방 */
     APP_ROOM_COUNT,
 } app_room_t;
 

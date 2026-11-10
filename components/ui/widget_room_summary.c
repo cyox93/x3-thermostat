@@ -2,11 +2,11 @@
 #include "ui_geometry.h"
 #include "theme.h"
 
-/* 거 / 큰 / 일 / 노 cells at the bottom of the master's MAIN screen.
+/* 거 / 큰 / 작 / 일 cells at the bottom of the master's MAIN screen.
    Child layout per cell: 0 = flame slot (child 0 = flame), 1 = letter. */
 lv_obj_t *summary_create(lv_obj_t *parent)
 {
-    static const char *const letters[APP_ROOM_COUNT] = { "거", "큰", "일", "노" };
+    static const char *const letters[APP_ROOM_COUNT] = { "거", "큰", "작", "일" };
     lv_obj_t *row = ui_box(parent, LV_FLEX_FLOW_ROW);
     lv_obj_set_style_pad_column(row, UIG_SUMMARY_GAP, 0);
 

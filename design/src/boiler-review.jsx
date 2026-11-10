@@ -19,10 +19,10 @@ const PAGES = [
   {
     num: '02-M',
     title: '메인 · 거실 기기',
-    desc: '거실에 설치된 기기는 모든 방을 제어합니다. 상단 "보일러" 표시는 어느 방이든 연소 중이면 주황 불꽃으로 켜지고, 하단 거·큰·일·노는 방별 상태입니다. 켜진 방은 밝은 회색, 연소 중인 방은 글자 앞에 불꽃, 지금 제어 중인 방은 네모 박스로 표시합니다.',
-    flow: 'ROOM 버튼 → 제어할 방 전환 (거실 → 큰방 → 일하는방 → 노는방) · 나머지 조작은 메인과 같음',
+    desc: '거실에 설치된 기기는 모든 방을 제어합니다. 상단 "보일러" 표시는 어느 방이든 연소 중이면 주황 불꽃으로 켜지고, 하단 거·큰·작·일은 방별 상태입니다. 켜진 방은 밝은 회색, 연소 중인 방은 글자 앞에 불꽃, 지금 제어 중인 방은 네모 박스로 표시합니다.',
+    flow: 'ROOM 버튼 → 제어할 방 전환 (거실 → 큰방 → 작은방 → 일하는방) · 나머지 조작은 메인과 같음',
     state: { kind: 'main', state: { on: true, target: 22.0 }, currentTemp: 21.4, humidity: 45, roomName: '거실', burning: true,
-      summary: [{ name: '거실', on: true, burning: true }, { name: '큰방', on: false, burning: false }, { name: '일하는방', on: true, burning: false }, { name: '노는방', on: false, burning: false }] },
+      summary: [{ name: '거실', on: true, burning: true }, { name: '큰방', on: false, burning: false }, { name: '작은방', on: false, burning: false }, { name: '일하는방', on: true, burning: false }] },
   },
   {
     num: '03',
@@ -37,7 +37,7 @@ const PAGES = [
     title: '설정 · 방선택',
     desc: '4개의 방 중 하나를 선택. 현재 활성 방이 가운데 강조되고, 위·아래로 미리보기가 함께 표시됩니다. 변경 후 짧게 눌러 확정합니다.',
     flow: '인코더 → 방 이동 · 버튼 짧게 → 확정 후 설정 목록으로 복귀',
-    state: { kind: 'room', selected: 2 }, // 일하는방
+    state: { kind: 'room', selected: 3 }, // 일하는방
   },
   {
     num: '05',

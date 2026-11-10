@@ -3,7 +3,7 @@
 
 const uint16_t app_screen_time_steps[APP_SCREEN_TIME_STEPS] = { 10, 20, 30, 60, 120, 300 };
 
-static const char *const s_room_names[APP_ROOM_COUNT] = { "거실", "큰방", "일하는방", "노는방" };
+static const char *const s_room_names[APP_ROOM_COUNT] = { "거실", "큰방", "작은방", "일하는방" };
 /* Same strings as the HTML simulator's getState().mode (design/TESTING.md) */
 static const char *const s_mode_names[APP_MODE_COUNT] = {
     "main", "settings", "edit-room", "edit-brightness", "edit-screenTime",
