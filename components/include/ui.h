@@ -3,7 +3,8 @@
 #include <stdint.h>
 #include "esp_err.h"
 
-/* Inputs the UI understands (docs/ui.md §2.1): K1 = SHORT/LONG, K2 = ROOM */
+/* Inputs the UI understands (docs/ui.md §2.1): K1 = SHORT/LONG, K2 = ROOM.
+   Light keys never reach the UI, so they do not wake the screen. */
 typedef enum {
     UI_IN_ENC_CW,
     UI_IN_ENC_CCW,

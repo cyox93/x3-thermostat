@@ -33,7 +33,7 @@ esp_err_t sc_led_brightness(uint8_t level)
     s_last_brightness = level ? level : 1;
     ESP_RETURN_ON_ERROR(ledc_set_duty(LEDC_LOW_SPEED_MODE, LED_LEDC_CHANNEL, level), TAG, "set duty failed");
     ESP_RETURN_ON_ERROR(ledc_update_duty(LEDC_LOW_SPEED_MODE, LED_LEDC_CHANNEL), TAG, "update duty failed");
-    ESP_LOGI(TAG, "LED brightness %d", level);
+    ESP_LOGD(TAG, "LED brightness %d", level);      /* every step of a UI fade */
     return ESP_OK;
 }
 
@@ -82,6 +82,7 @@ static int cmd_led_brightness(int argc, char **argv)
         return 1;
     }
     sc_led_brightness(level);
+    printf("LED brightness %d\n", level);
     return 0;
 }
 

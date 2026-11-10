@@ -3,6 +3,7 @@
 #include "esp_lvgl_port.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "config.h"
@@ -40,14 +41,36 @@ static void _post(const ui_msg_t *m)
     }
 }
 
-/* Settings that survive a reboot (NVS): the installed room and the screen
-   brightness. Screen time and heating are not stored yet (docs/ui.md stage 3). */
+/* Settings that survive a reboot (NVS): the installed room, the screen
+   brightness and time, and the installed room's heating */
 #define UI_CFG_ROOM   "ui_room"
 #define UI_CFG_BRIGHT "ui_bright"
+#define UI_CFG_STIME  "ui_stime"
 #define UI_CFG_HEAT   "ui_heat"           /* installed room: "<on> <target ×10>" */
 static int s_room_saved = -1;
 static int s_bright_saved = -1;
-static int s_bright_applied = -1;
+static int s_stime_saved = -1;
+static int s_duty_applied = -1;
+
+/* Screen time: after it the LCD and the LED ring go off together (duty 0 on
+   their shared line). Duty 1/255 would keep the ring lit with the LCD looking
+   off (bench 2026-11-10), but the user wants the ring off too; "항상" keeps
+   both on. */
+#define UI_DARK_DUTY 0
+static bool s_dark;
+static uint32_t s_input_ms;             /* last input, lv_tick */
+
+/* Going dark and waking fade instead of switching: the eye sees brightness
+   about as duty^(1/2.2), so the fade runs on that scale or it would look like
+   it drops off at once at the end. The ring only reacts on/off, so it still
+   goes out when the duty reaches 0. Editing the brightness stays immediate. */
+#define UI_FADE_OFF_MS 500
+#define UI_FADE_ON_MS  200
+#define UI_GAMMA       2.2f
+static bool s_fading;
+static uint32_t s_fade_ms;              /* fade start, lv_tick */
+static float s_fade_from;               /* perceived level 0..1 */
+static float s_level;                   /* perceived level now */
 
 static bool _cfg_get_int(const char *key, int *v)
 {
@@ -102,11 +125,17 @@ static void _settings_restore(void)
         s_bright_saved = app_state_get()->brightness;
         ESP_LOGI(TAG, "brightness %d %% (saved)", s_bright_saved);
     }
+    if (_cfg_get_int(UI_CFG_STIME, &v)) {
+        app_state_set_screen_time(v);       /* ignored unless one of the steps */
+        s_stime_saved = app_state_get()->screen_time_s;
+        ESP_LOGI(TAG, "screen time %d s (saved, 0 = always)", s_stime_saved);
+    }
     _heat_restore();
 }
 
 /* Saved once confirmed: the installed room only changes when its editor is
-   confirmed, and the brightness editor applies live, so wait until it is left */
+   confirmed; the brightness and screen-time editors change the value on every
+   step, so wait until they are left */
 static void _settings_save(void)
 {
     const app_state_t *st = app_state_get();
@@ -119,16 +148,64 @@ static void _settings_save(void)
         s_bright_saved = st->brightness;
         ESP_LOGI(TAG, "brightness %d %% saved", st->brightness);
     }
+    if (st->mode != APP_MODE_EDIT_SCREENTIME && st->screen_time_s != s_stime_saved &&
+        _cfg_set_int(UI_CFG_STIME, st->screen_time_s)) {
+        s_stime_saved = st->screen_time_s;
+        ESP_LOGI(TAG, "screen time %d s saved", st->screen_time_s);
+    }
 }
 
-/* The UI owns the backlight (docs/ui.md §2.2): 10..100 % on the 8-bit LEDC.
-   The LED ring shares the line, so it stays on while the screen is. */
+/* The UI owns the backlight (docs/ui.md §2.2): 10..100 % on the 8-bit LEDC,
+   UI_DARK_DUTY while dark. The LED ring shares the line: on unless dark. */
+static float _level_of(int duty) { return powf(duty / 255.0f, 1.0f / UI_GAMMA); }
+static int _duty_of(float level) { return (int)lroundf(255.0f * powf(level, UI_GAMMA)); }
+
+static void _fade_start(void)
+{
+    s_fading = true;
+    s_fade_ms = lv_tick_get();
+    s_fade_from = s_level;
+}
+
 static void _bright_apply(void)
 {
-    int pct = app_state_get()->brightness;
-    if (pct == s_bright_applied) return;
-    sc_led_brightness(pct * 255 / 100);
-    s_bright_applied = pct;
+    int duty = s_dark ? UI_DARK_DUTY : app_state_get()->brightness * 255 / 100;
+    if (s_fading) {
+        float t = (float)lv_tick_elaps(s_fade_ms) / (s_dark ? UI_FADE_OFF_MS : UI_FADE_ON_MS);
+        if (t >= 1.0f) {
+            s_fading = false;
+        } else {
+            float e = t * t * (3.0f - 2.0f * t);        /* smoothstep */
+            duty = _duty_of(s_fade_from + (_level_of(duty) - s_fade_from) * e);
+        }
+    }
+    if (duty == s_duty_applied) return;
+    sc_led_brightness(duty);
+    s_duty_applied = duty;
+    s_level = _level_of(duty);
+}
+
+/* Every input restarts the screen time. On a dark screen the first input only
+   wakes it (docs/ui.md §2.2): true = the input is used up. */
+static bool _wake(void)
+{
+    s_input_ms = lv_tick_get();
+    if (!s_dark) return false;
+    s_dark = false;
+    _fade_start();
+    ESP_LOGI(TAG, "screen on");
+    return true;
+}
+
+/* The mode and any value being edited stay as they are while dark */
+static void _screen_time_check(void)
+{
+    uint16_t sec = app_state_get()->screen_time_s;
+    if (s_dark || sec == APP_SCREEN_TIME_ALWAYS) return;
+    if (lv_tick_elaps(s_input_ms) < (uint32_t)sec * 1000) return;
+    s_dark = true;
+    _fade_start();
+    ESP_LOGI(TAG, "screen off after %d s", sec);
 }
 
 static ui_room_callback_t s_room_cb;
@@ -295,6 +372,7 @@ static void _drain(lv_timer_t *t)
     while (xQueueReceive(s_in_queue, &m, 0) == pdTRUE) {
         switch (m.kind) {
         case UI_MSG_INPUT:
+            if (_wake()) break;
             ui_input_apply(m.in);
             _heat_touch();
             break;
@@ -305,6 +383,7 @@ static void _drain(lv_timer_t *t)
         }
     }
     _heat_report();
+    _screen_time_check();
     _bright_apply();
     _settings_save();
     _report_room();
@@ -343,6 +422,7 @@ esp_err_t ui_init(void)
     lvgl_port_lock(0);
     app_state_init();
     _settings_restore();
+    s_input_ms = lv_tick_get();
     _bright_apply();
     ui_screens_create();
     app_state_subscribe(ui_screens_refresh);
