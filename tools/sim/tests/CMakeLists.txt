@@ -14,3 +14,7 @@ add_executable(test_app_input test_app_input.c
     ${X3_ROOT}/components/state/app_state.c ${X3_ROOT}/components/state/app_input.c)
 target_include_directories(test_app_input PRIVATE ${X3_ROOT}/components/include)
 add_test(NAME app_input COMMAND test_app_input)
+
+add_executable(test_plc_proto test_plc_proto.c ${X3_ROOT}/components/plcproto/plc_proto.c)
+target_include_directories(test_plc_proto PRIVATE ${X3_ROOT}/components/include)
+add_test(NAME plc_proto COMMAND test_plc_proto)
