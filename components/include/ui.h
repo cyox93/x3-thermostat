@@ -31,3 +31,17 @@ void ui_local_climate_update(int16_t temp_x10, int8_t humidity);
    registering, then whenever either changes. The receiver only posts. */
 typedef void (*ui_room_callback_t)(int room, bool heat_on, void *arg);
 void ui_register_room_callback(ui_room_callback_t cb, void *arg);
+
+/* Any thread: another room's values (the living-room unit, from the boiler
+   bus). Rooms are app_room_t. */
+void ui_room_climate_update(int room, int16_t temp_x10, int8_t humidity);
+void ui_room_burn_update(int room, bool burning);
+/* on/target changed outside the UI (bus). Ignored for a room whose own change
+   from the knob is still waiting to be reported. Never reported back. */
+void ui_room_heat_update(int room, bool on, int16_t target_x10);
+
+/* Called in the LVGL task when the user changed a room's on/target, once the
+   knob has been still for 300 ms (docs/ui.md §3.3) — and once per room at
+   start with the values the UI begins with. The receiver only posts. */
+typedef void (*ui_heat_callback_t)(int room, bool on, int16_t target_x10, void *arg);
+void ui_register_heat_callback(ui_heat_callback_t cb, void *arg);
