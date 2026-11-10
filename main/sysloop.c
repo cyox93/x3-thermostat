@@ -35,11 +35,14 @@ static const int _light_key[_LIGHT_MAX + 1] = { 0, 3, 4, 2 };    /* light → ke
 static const int SYSLOOP_ALS_TIMER_ID = 1;
 static const int SYSLOOP_TEMP_MEASURE_TIMER_ID = 2;
 static const int SYSLOOP_TEMP_GET_TIMER_ID = 3;
+static const int SYSLOOP_TEMP_START_TIMER_ID = 4;
 
 /* Room light changes slowly; brightness control filters further anyway */
 #define _ALS_PERIOD_MS          1000
 /* Room temperature moves slowly; frequent conversions also self-heat the sensor */
 #define _TEMP_PERIOD_MS        (1000 * 10)
+/* First reading soon after boot so the screen does not wait a whole period */
+#define _TEMP_FIRST_MS         2000
 #define _TEMP_RETRY_MS         10
 #define _TEMP_RETRY_MAX        5
 
@@ -354,6 +357,15 @@ static void _sysloop_temp_get_cb(int id, void *arg, void *data)
  * Triggers a measurement and schedules the get, so the loop is never blocked
  * for the ~80 ms the sensor takes.
  */
+static void _sysloop_temp_measure_cb(int id, void *arg, void *data);
+
+/* One-shot at _TEMP_FIRST_MS: measure now, then every _TEMP_PERIOD_MS */
+static void _sysloop_temp_start_cb(int id, void *arg, void *data)
+{
+    sc_eventloop_add_timer(_sysloop->loop, SYSLOOP_TEMP_MEASURE_TIMER_ID, _sysloop_temp_measure_cb, NULL, _TEMP_PERIOD_MS, true);
+    _sysloop_temp_measure_cb(SYSLOOP_TEMP_MEASURE_TIMER_ID, arg, data);
+}
+
 static void _sysloop_temp_measure_cb(int id, void *arg, void *data)
 {
     if (sc_temp_humid_measure_trigger() != ESP_OK) {
@@ -485,7 +497,7 @@ esp_err_t sc_sysloop_init(void)
     sc_eventloop_add_event(_sysloop->loop, SYSLOOP_ROOM_EVENT_ID, _room_event_handler, NULL);
 
     sc_eventloop_add_timer(_sysloop->loop, SYSLOOP_ALS_TIMER_ID, _sysloop_als_cb, NULL, _ALS_PERIOD_MS, true);
-    sc_eventloop_add_timer(_sysloop->loop, SYSLOOP_TEMP_MEASURE_TIMER_ID, _sysloop_temp_measure_cb, NULL, _TEMP_PERIOD_MS, true);
+    sc_eventloop_add_timer(_sysloop->loop, SYSLOOP_TEMP_START_TIMER_ID, _sysloop_temp_start_cb, NULL, _TEMP_FIRST_MS, false);
 
     sc_switchloop_register_key_callback(_switch_key_cb, NULL);
     sc_switchloop_register_ready_callback(_switch_ready_cb, NULL);
