@@ -23,7 +23,8 @@ const SETTING_ACCENT = '#cfcfcf';
 const VB = 240;
 const CX = 120, CY = 120;
 
-const SCREEN_TIME_STEPS = [10, 20, 30, 60, 120, 300]; // seconds
+const SCREEN_TIME_STEPS = [10, 20, 30, 60, 120, 300, 0]; // seconds; 0 = always on (last step)
+const screenTimeLabel = (v) => v === 0 ? '항상' : v >= 60 ? `${v / 60}분` : `${v}초`;
 const ROOMS = ['거실', '큰방', '작은방', '일하는방'];
 
 // ─── arc helper ──────────────────────────────────────────────
@@ -195,7 +196,7 @@ function ScreenSettings({ items, selected, settings }) {
   const fmt = (id) => {
     if (id === 'room') return settings.roomName;
     if (id === 'brightness') return `${settings.brightness}%`;
-    if (id === 'screenTime') return settings.screenTime >= 60 ? `${settings.screenTime/60}분` : `${settings.screenTime}초`;
+    if (id === 'screenTime') return screenTimeLabel(settings.screenTime);
     return '';
   };
   return (
@@ -311,7 +312,7 @@ function ScreenScreenTime({ value }) {
   const idx = Math.max(0, steps.indexOf(value));
   const startDeg = -130, endDeg = 130;
   const t = idx / (steps.length - 1);
-  const label = value >= 60 ? `${value / 60}분` : `${value}초`;
+  const label = screenTimeLabel(value);
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
       <svg viewBox={`0 0 ${VB} ${VB}`} style={{ position: 'absolute', inset: 0 }}>
@@ -690,7 +691,7 @@ function App() {
               {isMaster && <div><span style={{ color:'#888' }}>전체</span> {ROOMS.map(r => `${r} ${roomStates[r].on ? (burningOf(r) ? '연소' : 'ON') : 'OFF'}`).join(' · ')}</div>}
               {isMaster && <div><span style={{ color:'#888' }}>보일러</span> {ROOMS.some(r => roomStates[r].on && burningOf(r)) ? '연소 중' : '대기'}</div>}
               <div><span style={{ color:'#888' }}>화면밝기</span> {settings.brightness}%</div>
-              <div><span style={{ color:'#888' }}>화면시간</span> {settings.screenTime >= 60 ? `${settings.screenTime/60}분` : `${settings.screenTime}초`}</div>
+              <div><span style={{ color:'#888' }}>화면시간</span> {screenTimeLabel(settings.screenTime)}</div>
               <div><span style={{ color:'#888' }}>방</span> {roomName}</div>
             </div>
           </div>

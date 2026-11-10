@@ -22,9 +22,9 @@ USES = {  # font → strings drawn with it (docs/ui.md §4, design/README.md)
     'font_inter300_24': '%',
     'font_inter300_28': '°',
     'font_inter300_60': 'OFF',
-    'font_inter300_64': '0123456789. 초분',
+    'font_inter300_64': '0123456789. 초분항상',
     'font_inter300_72': '0123456789',
-    'font_jb400_17': '0123456789% 초분 ' + ROOMS,
+    'font_jb400_17': '0123456789% 초분항상 ' + ROOMS,
     'font_jb400_9': '0123/ OFF',
 }
 DIR = os.path.join(os.path.dirname(__file__), '../../components/ui/fonts')

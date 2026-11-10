@@ -34,7 +34,8 @@ typedef enum {
 #define APP_BRIGHTNESS_DEFAULT   70
 #define APP_SCREEN_TIME_DEFAULT  30
 #define APP_WIFI_LEVEL_MAX        3
-#define APP_SCREEN_TIME_STEPS     6
+#define APP_SCREEN_TIME_STEPS     7
+#define APP_SCREEN_TIME_ALWAYS    0     /* last step: never turn the screen off */
 
 typedef struct {
     bool    on;
@@ -52,11 +53,14 @@ typedef struct {
     uint8_t    settings_sel;    /* 0..3 */
     app_room_t room_edit_sel;
     uint8_t    brightness;      /* 10..100 % */
-    uint16_t   screen_time_s;   /* one of app_screen_time_steps */
+    uint16_t   screen_time_s;   /* one of app_screen_time_steps; APP_SCREEN_TIME_ALWAYS = always on */
     uint8_t    wifi_level;      /* 0..3 */
 } app_state_t;
 
-extern const uint16_t app_screen_time_steps[APP_SCREEN_TIME_STEPS];   /* 10 20 30 60 120 300 */
+extern const uint16_t app_screen_time_steps[APP_SCREEN_TIME_STEPS];   /* 10 20 30 60 120 300, always */
+
+/* "30초" / "5분" / "항상" — the label the settings list and the editor show */
+const char *app_screen_time_label(uint16_t seconds, char *buf, int len);
 
 typedef void (*app_state_observer_t)(void);
 

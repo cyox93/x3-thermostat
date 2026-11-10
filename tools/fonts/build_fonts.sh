@@ -32,7 +32,7 @@ done
 for sz in 12 23 26 32; do
   conv "$SRC/Pretendard-SemiBold.otf" $sz font_pret600_$sz "$KO$PRET_LATIN"
 done
-conv "$SRC/Pretendard-Medium.otf" 64 font_pret500_64 "분초"
+conv "$SRC/Pretendard-Medium.otf" 64 font_pret500_64 "분초항상"
 
 echo "Inter Tight 300"
 conv "$SRC/InterTight-Light.ttf" 24 font_inter300_24 "%"

@@ -104,7 +104,7 @@ static void test_settings_list(void)
     app_input_short();
     assert(ST->mode == APP_MODE_EDIT_SCREENTIME);
     for (int i = 0; i < 9; i++) app_input_enc(+1);
-    assert(ST->screen_time_s == 300);
+    assert(ST->screen_time_s == APP_SCREEN_TIME_ALWAYS);     /* last step, after 300 */
     for (int i = 0; i < 9; i++) app_input_enc(-1);
     assert(ST->screen_time_s == 10);
     app_input_short();

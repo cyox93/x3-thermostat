@@ -281,7 +281,7 @@
             "enc+"
           ],
           "expect": {
-            "screenTime": 300
+            "screenTime": 0
           },
           "snap": "max"
         },

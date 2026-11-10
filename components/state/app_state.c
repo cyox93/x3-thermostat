@@ -1,7 +1,8 @@
+#include <stdio.h>
 #include <string.h>
 #include "app_state.h"
 
-const uint16_t app_screen_time_steps[APP_SCREEN_TIME_STEPS] = { 10, 20, 30, 60, 120, 300 };
+const uint16_t app_screen_time_steps[APP_SCREEN_TIME_STEPS] = { 10, 20, 30, 60, 120, 300, APP_SCREEN_TIME_ALWAYS };
 
 static const char *const s_room_names[APP_ROOM_COUNT] = { "거실", "큰방", "작은방", "일하는방" };
 /* Same strings as the HTML simulator's getState().mode (design/TESTING.md) */
@@ -116,6 +117,14 @@ void app_state_set_brightness(uint8_t pct)
     if (pct > 100) pct = 100;
     s_state.brightness = pct;
     notify();
+}
+
+const char *app_screen_time_label(uint16_t seconds, char *buf, int len)
+{
+    if (seconds == APP_SCREEN_TIME_ALWAYS) snprintf(buf, len, "항상");
+    else if (seconds >= 60) snprintf(buf, len, "%d분", seconds / 60);
+    else snprintf(buf, len, "%d초", seconds);
+    return buf;
 }
 
 void app_state_set_screen_time(uint16_t seconds)

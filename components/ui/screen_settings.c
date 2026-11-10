@@ -43,9 +43,7 @@ void screen_settings_refresh(void)
 
     lv_label_set_text(s.value[0], app_room_name(st->installed_room));
     lv_label_set_text_fmt(s.value[1], "%d%%", st->brightness);
-    if (st->screen_time_s >= 60) snprintf(buf, sizeof(buf), "%d분", st->screen_time_s / 60);
-    else snprintf(buf, sizeof(buf), "%d초", st->screen_time_s);
-    lv_label_set_text(s.value[2], buf);
+    lv_label_set_text(s.value[2], app_screen_time_label(st->screen_time_s, buf, sizeof(buf)));
     lv_label_set_text(s.value[3], "");
 
     for (int i = 0; i < ITEMS; i++) {

@@ -74,9 +74,7 @@ void screen_edit_value_refresh(void)
         gauge_set_value(s.gauge, true, (st->brightness - 10) * 1000 / 90);
     } else {
         lv_label_set_text(s.title, "화면시간");
-        if (st->screen_time_s >= 60) snprintf(buf, sizeof(buf), "%d분", st->screen_time_s / 60);
-        else snprintf(buf, sizeof(buf), "%d초", st->screen_time_s);
-        ui_tight_label_set_text(s.time_num, buf);
+        ui_tight_label_set_text(s.time_num, app_screen_time_label(st->screen_time_s, buf, sizeof(buf)));
         gauge_set_value(s.gauge, true, time_index(st->screen_time_s) * 1000 / (APP_SCREEN_TIME_STEPS - 1));
     }
     wifi_set_level(s.wifi, st->wifi_level);
