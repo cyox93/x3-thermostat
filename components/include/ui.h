@@ -27,6 +27,10 @@ void ui_input(ui_input_t in);
    §3.3). UI_TEMP_NONE / UI_HUM_NONE clear a value the sensor no longer gives. */
 void ui_local_climate_update(int16_t temp_x10, int8_t humidity);
 
+/* Any thread: the room is dark (sysloop's ambient level, docs/architecture.md
+   §3.5). While dark the LCD runs at 10 % whatever the brightness setting. */
+void ui_ambient_dark(bool dark);
+
 /* Called in the LVGL task with the installed room (app_room_t) and whether
    heating is on in the room on screen (the one K1 switches): once soon after
    registering, then whenever either changes. The receiver only posts. */

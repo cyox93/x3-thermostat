@@ -11,6 +11,7 @@
 #include "freertos/FreeRTOS.h"
 
 #include "eventloop.h"
+#include "config.h"
 #include "device.h"
 #include "ui.h"
 #include "app_state.h"
@@ -26,6 +27,7 @@ static const char* TAG = "sysloop";
 #define SYSLOOP_ROOM_EVENT_ID       4
 #define SYSLOOP_HEAT_EVENT_ID       5
 #define SYSLOOP_PLC_EVENT_ID        6
+#define SYSLOOP_BRIGHT_EVENT_ID     7
 
 /* Lights: K3 = L1, K4 = L2 in every room; 큰방 has a third light on K2 (L3).
    Elsewhere K2 is the UI's ROOM key, which only the living room (master)
@@ -49,36 +51,35 @@ static const int SYSLOOP_TEMP_START_TIMER_ID = 4;
 #define _TEMP_RETRY_MAX        5
 
 /*
- * Brightness levels from ambient light. The goal is a unit that does not
- * light up the bedroom at night, so the thresholds sit at the dark end:
- *   < 3 lux   lights off (street light through curtains is ~1~5 lux)
- *   3~50 lux  bedside lamp / indirect light
- *   > 50 lux  room lights on (ceiling light is typically 100~300 lux)
- * Each boundary has hysteresis, and a new level must hold for a while
+ * Button LED brightness from ambient light, so the unit does not light up the
+ * bedroom at night. Two levels: below the threshold the LEDs drop to the dark
+ * level, and they come back only above twice the threshold (hysteresis). The
+ * threshold and the dark level are set per unit from the console
+ * (`bright lux` / `bright led`, docs/architecture.md §3.5) and kept in NVS —
+ * no settings screen, by the user's choice. A new level must hold for a while
  * before it is taken: going darker waits longer so a passing shadow does
  * nothing, going brighter is quick so switching the lights on is felt.
- * Lux is the datasheet-typical estimate — tune these on the bench.
+ * Lux is the datasheet-typical estimate, not calibrated.
+ * The ambient level sets only the button LEDs; the LCD backlight belongs to
+ * the UI's brightness setting (docs/ui.md §2.2).
  */
-#define _LUX_NIGHT_ENTER        3.0f
-#define _LUX_NIGHT_EXIT         8.0f
-#define _LUX_DIM_ENTER          30.0f
-#define _LUX_DIM_EXIT           60.0f
-#define _BRIGHT_DARKER_HOLD_S   20
-#define _BRIGHT_BRIGHTER_HOLD_S 3
+#define _DARK_LUX_DEFAULT       5       /* lights off; a lamp stays bright (user 2026-11-10) */
+#define _DARK_LUX_MAX           1000
+#define _DARK_LED_DEFAULT       3       /* % — visible without lighting the room */
+#define _DARK_EXIT_FACTOR       2
+#define _NORMAL_LED             100
+#define _BRIGHT_DARKER_HOLD_S   3       /* was 20: too slow when switching the light off (user) */
+#define _BRIGHT_BRIGHTER_HOLD_S 1
+#define _CFG_DARK_LUX           "bri_dark_lux"
+#define _CFG_DARK_LED           "bri_dark_led"
 
-/* The ambient level sets only the button LEDs; the LCD backlight belongs to
-   the UI's brightness setting (docs/ui.md §2.2) */
-typedef struct _bright_output {
-    uint8_t btn_led;    /* x3-switch button LEDs, % */
-} _bright_output_t;
+static const char *_bright_names[] = { "dark", "normal" };
 
-static const _bright_output_t _bright_outputs[] = {
-    [SC_BRIGHT_NIGHT]  = { .btn_led = 3   },
-    [SC_BRIGHT_DIM]    = { .btn_led = 30  },
-    [SC_BRIGHT_NORMAL] = { .btn_led = 100 },
-};
-
-static const char *_bright_names[] = { "night", "dim", "normal" };
+/* Console → sysloop: brightness settings change only in the loop thread */
+typedef struct _bright_event_data {
+    enum { _BRIGHT_SET_FORCE, _BRIGHT_SET_LUX, _BRIGHT_SET_LED } what;
+    int value;
+} _bright_event_data_t;
 
 /* Key event data for eventloop posting */
 typedef struct _room_event_data {
@@ -108,6 +109,8 @@ typedef struct _sysloop {
     sc_bright_level_t bright_pending;   /* candidate level while it holds */
     int bright_hold;                    /* seconds the candidate has held */
     int bright_force;                   /* -1 = auto, else forced level */
+    int dark_lux;                       /* below this the LEDs go dark */
+    int dark_led;                       /* button LED % while dark */
     int room;                           /* installed room (app_room_t), from the UI */
     bool heat_on;                       /* heating in the room on screen, from the UI */
 
@@ -396,25 +399,53 @@ static void _bright_set_level(sc_bright_level_t level)
              _bright_names[level], _sysloop->info.ambient_lux);
 
     _sysloop->info.bright_level = level;
-    sc_switch_led_brightness(_bright_outputs[level].btn_led);
+    sc_switch_led_brightness(level == SC_BRIGHT_DARK ? _sysloop->dark_led : _NORMAL_LED);
+    ui_ambient_dark(level == SC_BRIGHT_DARK);
 }
 
 /* Target level for this reading, with hysteresis around the current one */
 static sc_bright_level_t _bright_target(float lux, sc_bright_level_t cur)
 {
-    switch (cur) {
-    case SC_BRIGHT_NIGHT:
-        if (lux > _LUX_DIM_EXIT) return SC_BRIGHT_NORMAL;
-        if (lux > _LUX_NIGHT_EXIT) return SC_BRIGHT_DIM;
-        return SC_BRIGHT_NIGHT;
-    case SC_BRIGHT_DIM:
-        if (lux > _LUX_DIM_EXIT) return SC_BRIGHT_NORMAL;
-        if (lux < _LUX_NIGHT_ENTER) return SC_BRIGHT_NIGHT;
-        return SC_BRIGHT_DIM;
-    default:
-        if (lux < _LUX_NIGHT_ENTER) return SC_BRIGHT_NIGHT;
-        if (lux < _LUX_DIM_ENTER) return SC_BRIGHT_DIM;
-        return SC_BRIGHT_NORMAL;
+    if (cur == SC_BRIGHT_DARK) {
+        return lux > _sysloop->dark_lux * _DARK_EXIT_FACTOR ? SC_BRIGHT_NORMAL : SC_BRIGHT_DARK;
+    }
+    return lux < _sysloop->dark_lux ? SC_BRIGHT_DARK : SC_BRIGHT_NORMAL;
+}
+
+static int _cfg_int(const char *key, int def, int lo, int hi)
+{
+    char buf[12];
+    if (sc_config_get(key, buf, sizeof(buf)) != ESP_OK) return def;
+    int v = atoi(buf);
+    return v < lo || v > hi ? def : v;
+}
+
+static void _cfg_save_int(const char *key, int v)
+{
+    char buf[12];
+    snprintf(buf, sizeof(buf), "%d", v);
+    esp_err_t err = sc_config_set(key, buf);
+    if (err != ESP_OK) ESP_LOGW(TAG, "save %s: %s", key, esp_err_to_name(err));
+}
+
+static void _bright_event_handler(int id, void *arg, void *data)
+{
+    const _bright_event_data_t *d = data;
+    switch (d->what) {
+    case _BRIGHT_SET_FORCE:
+        _sysloop->bright_force = d->value;  /* applied on the next ALS sample (≤ 1 s) */
+        break;
+    case _BRIGHT_SET_LUX:
+        _sysloop->dark_lux = d->value;
+        _cfg_save_int(_CFG_DARK_LUX, d->value);
+        ESP_LOGI(TAG, "dark below %d lux (back above %d), saved", d->value, d->value * _DARK_EXIT_FACTOR);
+        break;
+    case _BRIGHT_SET_LED:
+        _sysloop->dark_led = d->value;
+        _cfg_save_int(_CFG_DARK_LED, d->value);
+        if (_sysloop->info.bright_level == SC_BRIGHT_DARK) sc_switch_led_brightness(d->value);
+        ESP_LOGI(TAG, "button LEDs %d %% while dark, saved", d->value);
+        break;
     }
 }
 
@@ -543,14 +574,16 @@ static int _sysinfo_cmd(int argc, char **argv)
         printf("climate  : -\n");
     }
     printf("ambient  : ~%.0f lux\n", info->ambient_lux);
-    printf("bright   : %s%s, screen %s\n", _bright_names[info->bright_level],
-           _sysloop->bright_force >= 0 ? " (forced)" : "", info->screen_on ? "on" : "off");
+    printf("bright   : %s%s — button LEDs %d %% (dark below %d lux, back above %d; dark LEDs %d %%)\n",
+           _bright_names[info->bright_level], _sysloop->bright_force >= 0 ? " (forced)" : "",
+           info->bright_level == SC_BRIGHT_DARK ? _sysloop->dark_led : _NORMAL_LED,
+           _sysloop->dark_lux, _sysloop->dark_lux * _DARK_EXIT_FACTOR, _sysloop->dark_led);
     printf("x3switch : %s\n", sc_switch_is_ready() ? "ready" : "not responding");
     return 0;
 }
 
-/* bright [auto|night|dim|normal] */
-static struct { struct arg_str *mode; struct arg_end *end; } _bright_args;
+/* bright [auto|dark|normal] · bright lux <n> · bright led <n> */
+static struct { struct arg_str *mode; struct arg_int *value; struct arg_end *end; } _bright_args;
 
 static int _bright_cmd(int argc, char **argv)
 {
@@ -564,27 +597,39 @@ static int _bright_cmd(int argc, char **argv)
     }
 
     const char *m = _bright_args.mode->sval[0];
-    int force = -2;
-    if (strcmp(m, "auto") == 0) force = -1;
-    for (int i = 0; i <= SC_BRIGHT_NORMAL; i++) {
-        if (strcmp(m, _bright_names[i]) == 0) force = i;
+    bool has_value = _bright_args.value->count > 0;
+    int v = has_value ? _bright_args.value->ival[0] : 0;
+    _bright_event_data_t d = { .what = _BRIGHT_SET_FORCE, .value = -2 };
+    if (!strcmp(m, "lux") || !strcmp(m, "led")) {
+        bool lux = !strcmp(m, "lux");
+        int hi = lux ? _DARK_LUX_MAX : 100;
+        if (!has_value || v < (lux ? 1 : 0) || v > hi) {
+            printf("Invalid: bright %s <%d-%d>\n", m, lux ? 1 : 0, hi);
+            return 1;
+        }
+        d = (_bright_event_data_t){ .what = lux ? _BRIGHT_SET_LUX : _BRIGHT_SET_LED, .value = v };
+    } else {
+        if (!strcmp(m, "auto")) d.value = -1;
+        for (int i = 0; i <= SC_BRIGHT_NORMAL; i++) {
+            if (!strcmp(m, _bright_names[i])) d.value = i;
+        }
+        if (d.value == -2) {
+            printf("Invalid: '%s' (use auto, dark, normal, lux <n>, led <n>)\n", m);
+            return 1;
+        }
     }
-    if (force == -2) {
-        printf("Invalid: '%s' (use auto, night, dim, normal)\n", m);
-        return 1;
-    }
-
-    /* Takes effect on the next ALS sample (≤ 1 s), in the sysloop thread */
-    _sysloop->bright_force = force;
+    sc_eventloop_post_event(_sysloop->loop, SYSLOOP_BRIGHT_EVENT_ID, &d, sizeof(d));
     return 0;
 }
 
 static void _sysloop_cmd_init(void)
 {
-    _bright_args.mode = arg_str0(NULL, NULL, "<auto|night|dim|normal>", "force a level (bench, no sensor)");
-    _bright_args.end = arg_end(1);
+    _bright_args.mode = arg_str0(NULL, NULL, "<auto|dark|normal|lux|led>",
+                                 "force a level (bench, no sensor), or set the dark threshold / LED %");
+    _bright_args.value = arg_int0(NULL, NULL, "<n>", "lux: dark below n lux (1-1000) · led: button LED % while dark (0-100); saved");
+    _bright_args.end = arg_end(2);
     ESP_ERROR_CHECK(esp_console_cmd_register(&(esp_console_cmd_t){
-        .command = "bright", .help = "Show or force the ambient brightness level (button LEDs)",
+        .command = "bright", .help = "Button LEDs by ambient light: show, force, or set the dark threshold and level",
         .func = &_bright_cmd, .argtable = &_bright_args,
     }));
 
@@ -633,6 +678,9 @@ esp_err_t sc_sysloop_init(void)
     _sysloop->info.bright_level = SC_BRIGHT_NORMAL;
     _sysloop->bright_pending = SC_BRIGHT_NORMAL;
     _sysloop->bright_force = -1;
+    _sysloop->dark_lux = _cfg_int(_CFG_DARK_LUX, _DARK_LUX_DEFAULT, 1, _DARK_LUX_MAX);
+    _sysloop->dark_led = _cfg_int(_CFG_DARK_LED, _DARK_LED_DEFAULT, 0, 100);
+    ESP_LOGI(TAG, "button LEDs %d %% below %d lux", _sysloop->dark_led, _sysloop->dark_lux);
     _sysloop->info.screen_on = true;
     _sysloop->ring_burning = -1;
 
@@ -647,6 +695,7 @@ esp_err_t sc_sysloop_init(void)
     sc_eventloop_add_event(_sysloop->loop, SYSLOOP_ROOM_EVENT_ID, _room_event_handler, NULL);
     sc_eventloop_add_event(_sysloop->loop, SYSLOOP_HEAT_EVENT_ID, _heat_event_handler, NULL);
     sc_eventloop_add_event(_sysloop->loop, SYSLOOP_PLC_EVENT_ID, _plc_event_handler, NULL);
+    sc_eventloop_add_event(_sysloop->loop, SYSLOOP_BRIGHT_EVENT_ID, _bright_event_handler, NULL);
 
     sc_eventloop_add_timer(_sysloop->loop, SYSLOOP_ALS_TIMER_ID, _sysloop_als_cb, NULL, _ALS_PERIOD_MS, true);
     sc_eventloop_add_timer(_sysloop->loop, SYSLOOP_TEMP_START_TIMER_ID, _sysloop_temp_start_cb, NULL, _TEMP_FIRST_MS, false);

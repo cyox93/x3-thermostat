@@ -25,7 +25,8 @@ static const char *TAG = "ui";
 static QueueHandle_t s_in_queue;
 
 typedef struct {
-    enum { UI_MSG_INPUT, UI_MSG_LOCAL_CLIMATE, UI_MSG_ROOM_CLIMATE, UI_MSG_ROOM_BURN, UI_MSG_ROOM_HEAT } kind;
+    enum { UI_MSG_INPUT, UI_MSG_LOCAL_CLIMATE, UI_MSG_ROOM_CLIMATE, UI_MSG_ROOM_BURN, UI_MSG_ROOM_HEAT,
+           UI_MSG_AMBIENT_DARK } kind;
     ui_input_t in;
     int8_t room;
     bool flag;                          /* burning, or heat on */
@@ -60,6 +61,13 @@ static int s_duty_applied = -1;
 static bool s_dark;
 static uint32_t s_input_ms;             /* last input, lv_tick */
 
+/* In a dark room (sysloop's ambient level, the one that dims the button LEDs)
+   the LCD runs at 10 % whatever the brightness setting, and goes back to the
+   setting when the room is lit — the user's choice, so the screen does not
+   light the bedroom. The brightness editor still shows the setting live. */
+#define UI_AMBIENT_DARK_PCT 10
+static bool s_ambient_dark;
+
 /* Going dark and waking fade instead of switching: the eye sees brightness
    about as duty^(1/2.2), so the fade runs on that scale or it would look like
    it drops off at once at the end. The ring only reacts on/off, so it still
@@ -69,6 +77,7 @@ static uint32_t s_input_ms;             /* last input, lv_tick */
 #define UI_GAMMA       2.2f
 static bool s_fading;
 static uint32_t s_fade_ms;              /* fade start, lv_tick */
+static uint32_t s_fade_len;             /* ms: down UI_FADE_OFF_MS, up UI_FADE_ON_MS */
 static float s_fade_from;               /* perceived level 0..1 */
 static float s_level;                   /* perceived level now */
 
@@ -156,22 +165,32 @@ static void _settings_save(void)
 }
 
 /* The UI owns the backlight (docs/ui.md §2.2): 10..100 % on the 8-bit LEDC,
-   UI_DARK_DUTY while dark. The LED ring shares the line: on unless dark. */
+   10 % in a dark room, UI_DARK_DUTY while the screen is off. The LED ring
+   shares the line: on unless the screen is off. */
 static float _level_of(int duty) { return powf(duty / 255.0f, 1.0f / UI_GAMMA); }
 static int _duty_of(float level) { return (int)lroundf(255.0f * powf(level, UI_GAMMA)); }
+
+static int _duty_target(void)
+{
+    const app_state_t *st = app_state_get();
+    if (s_dark) return UI_DARK_DUTY;
+    int pct = s_ambient_dark && st->mode != APP_MODE_EDIT_BRIGHTNESS ? UI_AMBIENT_DARK_PCT : st->brightness;
+    return pct * 255 / 100;
+}
 
 static void _fade_start(void)
 {
     s_fading = true;
     s_fade_ms = lv_tick_get();
     s_fade_from = s_level;
+    s_fade_len = _level_of(_duty_target()) < s_level ? UI_FADE_OFF_MS : UI_FADE_ON_MS;
 }
 
 static void _bright_apply(void)
 {
-    int duty = s_dark ? UI_DARK_DUTY : app_state_get()->brightness * 255 / 100;
+    int duty = _duty_target();
     if (s_fading) {
-        float t = (float)lv_tick_elaps(s_fade_ms) / (s_dark ? UI_FADE_OFF_MS : UI_FADE_ON_MS);
+        float t = (float)lv_tick_elaps(s_fade_ms) / s_fade_len;
         if (t >= 1.0f) {
             s_fading = false;
         } else {
@@ -351,6 +370,11 @@ void ui_input(ui_input_t in)
     _post(&(ui_msg_t){ .kind = UI_MSG_INPUT, .in = in });
 }
 
+void ui_ambient_dark(bool dark)
+{
+    _post(&(ui_msg_t){ .kind = UI_MSG_AMBIENT_DARK, .flag = dark });
+}
+
 void ui_local_climate_update(int16_t temp_x10, int8_t humidity)
 {
     _post(&(ui_msg_t){ .kind = UI_MSG_LOCAL_CLIMATE, .temp_x10 = temp_x10, .humidity = humidity });
@@ -380,6 +404,12 @@ static void _drain(lv_timer_t *t)
         case UI_MSG_ROOM_CLIMATE:  _room_climate_apply(m.room, m.temp_x10, m.humidity); break;
         case UI_MSG_ROOM_BURN:     _room_burn_apply(m.room, m.flag); break;
         case UI_MSG_ROOM_HEAT:     _room_heat_apply(m.room, m.flag, m.temp_x10); break;
+        case UI_MSG_AMBIENT_DARK:
+            if (m.flag == s_ambient_dark) break;
+            s_ambient_dark = m.flag;
+            _fade_start();
+            ESP_LOGI(TAG, "room %s: LCD %s", m.flag ? "dark" : "lit", m.flag ? "10 %" : "at the setting");
+            break;
         }
     }
     _heat_report();

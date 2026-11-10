@@ -58,11 +58,10 @@ typedef struct sc_sysinfo {
     bool screen_on;
 } sc_sysinfo_t;
 
-/* Display / button LED brightness, chosen from ambient light */
+/* Button LED brightness, chosen from ambient light (docs/architecture.md §3.5) */
 typedef enum {
-    SC_BRIGHT_NIGHT,        /* lights off, sleeping — screen off unless touched */
-    SC_BRIGHT_DIM,          /* lamp / indirect light */
-    SC_BRIGHT_NORMAL,       /* room lights on */
+    SC_BRIGHT_DARK,         /* below the threshold: the dark LED level */
+    SC_BRIGHT_NORMAL,       /* room lit: full */
 } sc_bright_level_t;
 
 esp_err_t sc_sysloop_init(void);

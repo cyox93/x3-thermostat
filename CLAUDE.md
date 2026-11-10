@@ -111,8 +111,10 @@ work through `ui.h`, which queues and returns (`docs/ui.md` §3.3).
 5. **Ambient light sensor must stay on ADC1** (IO1). ADC2 is unusable with WiFi on,
    and the sensor must not see the unit's own LCD/LED light (feedback loop).
 6. USB-C alone cannot power the X3 body (relays); only the panel works on USB.
-7. **The ambient light level only sets the button LEDs.** The LCD backlight belongs to the UI's
-   brightness setting (saved in NVS); 100 % equals IO14 held high — the panel's maximum.
+7. **The LCD backlight belongs to the UI.** It follows the UI's brightness setting (saved in NVS;
+   100 % equals IO14 held high — the panel's maximum). sysloop's ambient level sets the button
+   LEDs and only *tells* the UI when the room is dark (`ui_ambient_dark()`), which then holds the
+   LCD at 10 %; sysloop never drives the backlight itself.
 
 ## Conventions
 

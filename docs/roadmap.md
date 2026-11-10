@@ -13,7 +13,7 @@
 | 온습도 드라이버 `temp_humid` (AHT25, `temp_get`) | ✅ 실기 확인 (개발 보드, 2026-09-29) |
 | x3-switch 드라이버 + switchloop (AT 클라이언트, 상태 동기화, CLICK/LONG) | ✅ 빌드 확인, **실기 미확인** |
 | loop 구조 (`main/` mainloop · switchloop · sysloop, eventloop 기반) | ✅ 빌드 확인 |
-| 밝기 3단계 (NORMAL / DIM / NIGHT) — 임시 사양 | ✅ 빌드 확인 |
+| 버튼 LED 밝기 2단계 (NORMAL / DARK) — 기준 · 어두울 때 밝기를 콘솔에서 | ✅ 실기 확인 |
 | PLC 파형 규칙 실측 (MC200 송신: 셀 1017 µs, 온타임 PWM, 프레임 = 8비트) | ✅ `docs/plc-protocol.md` |
 | PLC 드라이버 (RMT RX/TX) + plcloop | ✅ 실기 수신 · echo 확인 |
 | PLC 메시지 해독 — 종류 · 방향 · 주소 · 상태 비트 · 항목 · 모드 · 등록 / 알림 / 원격 설정 순서 (LT200SPD · DT-200 실측) | ✅ `docs/plc-protocol.md` §5 — 일부 항목 미상 |
@@ -46,7 +46,7 @@
 - [x] 불명 신호 IO8 — 엔코더 공통이었다
 - [x] 온습도(AHT25): `temp_get` 응답 · 값 확인 (개발 보드: 27.0°C / 46.5%RH, sysloop 10 s 주기 측정도 `sysinfo`로 확인)
 - [ ] 온습도(AHT25): main-board에서 R14 · R15 실장 상태로 다시 확인
-- [ ] 센서 없이 보드만 켤 때는 `bright normal` — 안 하면 20 s 뒤 NIGHT로 화면이 꺼진다
+- [ ] 센서 없이 보드만 켤 때는 `bright normal` — 안 하면 어두운 책상에서 3 s 뒤 DARK로 버튼 LED와 LCD가 어두워진다
 - [ ] 조도 센서 (R_L 100 kΩ): 소등 · 스탠드 · 천장 조명에서 `als_read` 값 기록 → 경계값(3 / 8 / 30 / 60 lux) 확인
 
 ## Phase B — x3-switch 링크
@@ -72,6 +72,7 @@
 - [x] LED Ring = 난방 동작 표시 — 설치 방이 연소 중(요구 && 보일러 가동)이면 빨강, 아니면 흰색. 버튼 LED = 채널 상태 (sysloop)
 - [ ] 목표 온도 · 모드 NVS 저장/복원
 - [x] **밝기 3단계** (NORMAL / DIM / NIGHT) — 히스테리시스 · 머무름 시간. 2026-11-08부터 버튼 LED에만 쓴다 (백라이트는 UI)
+- [x] **버튼 LED 2단계** (2026-11-10) — 기준 lux · 어두울 때 밝기를 `bright lux` / `bright led`로 정하고 NVS 저장
 - [ ] 밤 실사용 확인 — 잘 때 방이 밝지 않은지, 깨운 화면이 되먹임을 일으키지 않는지
 - [ ] 밤에 노브 첫 칸은 화면만 깨우기, 단계 전환 페이드
 - [ ] **밝기 사양 재정리** — 실제 구현 시 단계 · 경계값 · 밤 화면 동작을 다시 정한다
