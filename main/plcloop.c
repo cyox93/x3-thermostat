@@ -11,6 +11,7 @@
 
 #include "eventloop.h"
 #include "plc.h"
+#include "plc_proto.h"
 #include "board.h"
 
 #include "main.h"
@@ -22,9 +23,11 @@ static const char* TAG = "plcloop";
 #define PLCLOOP_RX_ERROR_EVENT_ID   2   /* burst that was not a frame (ISR) */
 #define PLCLOOP_TX_DONE_EVENT_ID    3   /* send finished (ISR) */
 #define PLCLOOP_SEND_EVENT_ID       4   /* sc_plcloop_send */
+#define PLCLOOP_ROLE_EVENT_ID       5   /* sc_plcloop_set_role / set_heat / set_temp / request_set */
 
 /* Timer ids */
 static const int PLCLOOP_GROUP_TIMER_ID = 1;
+static const int PLCLOOP_ANSWER_TIMER_ID = 3;
 #if CONFIG_SC_PLC_MC200_STANDIN
 static const int PLCLOOP_MC200_TIMER_ID = 2;
 #endif
@@ -46,6 +49,11 @@ static const int PLCLOOP_MC200_TIMER_ID = 2;
 #define _MSG_HEADER         0x80
 #define _MSG_LEN_MASK       0x0F
 #define _MSG_SUM_MASK       0x7F
+
+/* A message closes ~5 ms after its last frame (RMT idle). Real controllers'
+ * answers land 60~95 ms after the poll (§2); starting ours 20 ms after the
+ * poll closes puts it at ~73 ms. */
+#define _ANSWER_DELAY_MS    20
 
 /* Temporary: every complete group as a hex line on UART0 (J3), so the bus
  * can be logged by another machine while decoding the codes. */
@@ -73,6 +81,19 @@ typedef struct _plc_send_data {
     uint8_t data[SC_PLC_SEND_MAX];
 } _plc_send_data_t;
 
+typedef enum {
+    _ROLE_OP_ROLE,
+    _ROLE_OP_HEAT,
+    _ROLE_OP_TEMP,
+    _ROLE_OP_REQUEST,
+} _role_op_t;
+
+typedef struct _role_cmd {
+    _role_op_t op;
+    uint8_t a, b, c;
+    int16_t v;
+} _role_cmd_t;
+
 typedef struct _plc_group {
     uint8_t data[_GROUP_MAX];
     int len;
@@ -99,6 +120,15 @@ typedef struct _plcloop {
     _plc_send_data_t sending;   /* on the wire, joins the group when done */
 
     int64_t bus_us;             /* last traffic, ours or not */
+
+    /* Controller role (components/plcproto) */
+    sc_proto_t proto;
+    uint8_t rx_msg[SC_PROTO_MSG_MAX];
+    int rx_len;
+    sc_proto_msg_t answer;      /* waiting for _ANSWER_DELAY_MS */
+    uint32_t answered;
+    sc_plcloop_callback_t cb;
+    void *cb_arg;
 #if CONFIG_SC_PLC_MC200_STANDIN
     /* Bench MC200 stand-in */
     bool mc200;
@@ -202,9 +232,9 @@ static void _group_timer_cb(int id, void *arg, void *data)
         _plcloop->group_changes++;
     }
 
-    /* TODO: policy — interpret the group once the code meanings are known */
     _plcloop->last = *cur;
     cur->len = 0;
+    _plcloop->rx_len = 0;       /* a message never spans groups */
 #if CONFIG_SC_PLC_MC200_STANDIN
     /* A message never spans groups */
     _plcloop->mc200_rx_len = 0;
@@ -357,6 +387,129 @@ static void _mc200_timer_cb(int id, void *arg, void *data)
 
 #endif
 
+/* ========== Controller role ========== */
+
+static void _note(sc_plc_note_kind_t kind, uint8_t addr)
+{
+    if (!_plcloop->cb) return;
+    const sc_proto_t *p = &_plcloop->proto;
+    sc_plc_note_t n = { .kind = kind, .addr = addr, .boiler = p->boiler };
+    if (kind == SC_PLC_NOTE_ROOM) {
+        const sc_proto_room_t *r = &p->room[addr];
+        n.demand = r->demand;
+        n.temp2 = r->temp2;
+        n.set2 = r->set2;
+        n.mode = r->mode;
+    } else {
+        n.addr = p->addr;
+        n.demand = p->demand;
+        n.temp2 = p->temp2;
+        n.set2 = p->set2;
+        n.mode = p->mode;
+    }
+    _plcloop->cb(&n, _plcloop->cb_arg);
+}
+
+static void _notes(const sc_proto_out_t *out)
+{
+    if (out->chg & SC_PROTO_CHG_OWN) _note(SC_PLC_NOTE_OWN, 0);
+    if (out->chg & SC_PROTO_CHG_ROOMS) {
+        for (int a = 0; a <= SC_PROTO_ADDR_MAX; a++) {
+            if (out->rooms_changed & (1 << a)) _note(SC_PLC_NOTE_ROOM, a);
+        }
+    }
+    if (out->chg & (SC_PROTO_CHG_BOILER | SC_PROTO_CHG_DEMAND)) _note(SC_PLC_NOTE_STATE, 0);
+}
+
+static void _msg_str(const sc_proto_msg_t *m, char *buf, size_t len)
+{
+    size_t n = 0;
+    buf[0] = '\0';
+    for (int i = 0; i < m->len && n < len; i++) n += snprintf(buf + n, len - n, "%s%02X", i ? " " : "", m->b[i]);
+}
+
+static void _answer_timer_cb(int id, void *arg, void *data)
+{
+    sc_proto_msg_t *m = &_plcloop->answer;
+    if (!m->len) return;
+
+    if (_send(m->b, m->len) == ESP_OK) _plcloop->answered++;
+    /* The plain poll answer every 254 ms would flood the log */
+    if ((m->b[0] & 0xF0) != 0xE0) {
+        char str[SC_PROTO_MSG_MAX * 3 + 1];
+        _msg_str(m, str, sizeof(str));
+        ESP_LOGI(TAG, "sent %s", str);
+    }
+    m->len = 0;
+}
+
+static void _proto_message(const uint8_t *m, int len)
+{
+    sc_proto_out_t out = { 0 };
+    sc_proto_rx(&_plcloop->proto, m, len, esp_timer_get_time() / 1000, &out);
+    if (out.tx.len) {
+        _plcloop->answer = out.tx;
+        sc_eventloop_add_timer(_plcloop->loop, PLCLOOP_ANSWER_TIMER_ID, _answer_timer_cb, NULL, _ANSWER_DELAY_MS, false);
+    }
+    _notes(&out);
+}
+
+/* Gather received bytes into messages by the header's length */
+static void _proto_rx(uint8_t byte)
+{
+    uint8_t *m = _plcloop->rx_msg;
+    int *n = &_plcloop->rx_len;
+
+    if (*n == 0 && !(byte & _MSG_HEADER)) return;
+    m[(*n)++] = byte;
+
+    int len = m[0] & _MSG_LEN_MASK;
+    if (len < 2) {
+        *n = 0;
+        return;
+    }
+    if (*n < len) return;
+    *n = 0;
+
+    uint32_t sum = 0;
+    for (int i = 0; i < len - 1; i++) sum += m[i];
+    if ((sum & _MSG_SUM_MASK) != m[len - 1]) return;
+    _proto_message(m, len);
+}
+
+static void _role_event_handler(int id, void *arg, void *data)
+{
+    _role_cmd_t *c = (_role_cmd_t *)data;
+    sc_proto_t *p = &_plcloop->proto;
+    sc_proto_out_t out = { 0 };
+
+    switch (c->op) {
+    case _ROLE_OP_ROLE: {
+        int16_t temp2 = p->temp2;
+        sc_proto_init(p, c->a, c->b, c->c);
+        sc_proto_set_temp(p, temp2, NULL);
+        _plcloop->answer.len = 0;
+        ESP_LOGI(TAG, "role: %s, address %d", c->a == 0 ? "listen only" :
+                 c->a == SC_PROTO_ADDR_LIVING ? "living room" : "room", c->a);
+        out.chg |= SC_PROTO_CHG_DEMAND;     /* report our state afresh */
+        break;
+    }
+    case _ROLE_OP_HEAT:
+        sc_proto_set_mode(p, c->a, &out);
+        sc_proto_set_setpoint(p, c->b, &out);
+        break;
+    case _ROLE_OP_TEMP:
+        sc_proto_set_temp(p, c->v, &out);
+        break;
+    case _ROLE_OP_REQUEST:
+        if (!sc_proto_request_set(p, c->a, c->b, c->c)) {
+            ESP_LOGW(TAG, "request to %d not queued (not the living room, or full)", c->a);
+        }
+        break;
+    }
+    _notes(&out);
+}
+
 static void _rx_event_handler(int id, void *arg, void *data)
 {
     int value = *(int *)data;
@@ -373,6 +526,7 @@ static void _rx_event_handler(int id, void *arg, void *data)
     if (_plcloop->monitor) printf("plc: rx %02X\n", byte);
 
     _group_add(byte);
+    _proto_rx(byte);
 #if CONFIG_SC_PLC_MC200_STANDIN
     if (_plcloop->mc200) _mc200_rx(byte);
 #endif
@@ -448,6 +602,41 @@ esp_err_t sc_plcloop_send(const uint8_t *data, size_t len)
     return sc_eventloop_post_event(_plcloop->loop, PLCLOOP_SEND_EVENT_ID, &send, sizeof(send));
 }
 
+static esp_err_t _role_post(const _role_cmd_t *c)
+{
+    ESP_RETURN_ON_FALSE(_plcloop, ESP_ERR_INVALID_STATE, TAG, "plcloop not initialized");
+    return sc_eventloop_post_event(_plcloop->loop, PLCLOOP_ROLE_EVENT_ID, (void *)c, sizeof(*c));
+}
+
+esp_err_t sc_plcloop_set_role(uint8_t addr, uint8_t mode, uint8_t set2)
+{
+    ESP_RETURN_ON_FALSE(addr <= SC_PROTO_ADDR_MAX, ESP_ERR_INVALID_ARG, TAG, "invalid address %d", addr);
+    return _role_post(&(_role_cmd_t){ .op = _ROLE_OP_ROLE, .a = addr, .b = mode, .c = set2 });
+}
+
+esp_err_t sc_plcloop_set_heat(uint8_t mode, uint8_t set2)
+{
+    return _role_post(&(_role_cmd_t){ .op = _ROLE_OP_HEAT, .a = mode, .b = set2 });
+}
+
+esp_err_t sc_plcloop_set_temp(int16_t temp2)
+{
+    return _role_post(&(_role_cmd_t){ .op = _ROLE_OP_TEMP, .v = temp2 });
+}
+
+esp_err_t sc_plcloop_request_set(uint8_t addr, uint8_t item, uint8_t value)
+{
+    return _role_post(&(_role_cmd_t){ .op = _ROLE_OP_REQUEST, .a = addr, .b = item, .c = value });
+}
+
+esp_err_t sc_plcloop_register_callback(sc_plcloop_callback_t callback, void *arg)
+{
+    ESP_RETURN_ON_FALSE(_plcloop, ESP_ERR_INVALID_STATE, TAG, "plcloop not initialized");
+    _plcloop->cb_arg = arg;
+    _plcloop->cb = callback;
+    return ESP_OK;
+}
+
 /* ========== Console ========== */
 
 static int _plc_cmd(int argc, char **argv)
@@ -466,6 +655,24 @@ static int _plc_cmd(int argc, char **argv)
     printf("errors     : %lu no-start, %lu bad bits\n", _plcloop->err_no_start, _plcloop->err_bits);
     printf("sent       : %lu sends, %lu echo frames\n", _plcloop->sent, _plcloop->echoes);
     printf("carrier    : %s\n", sc_plc_carrier() ? "on" : "off");
+
+    const sc_proto_t *p = &_plcloop->proto;
+    printf("role       : %s, address %d, %s, %lu answers sent\n",
+           p->addr == 0 ? "listen only" : p->addr == SC_PROTO_ADDR_LIVING ? "living room" : "room",
+           p->addr, p->registered ? "registered" : "not registered", _plcloop->answered);
+    char room[8] = "-", hot[8] = "-";
+    if (p->temp2 != SC_PROTO_TEMP_NONE) snprintf(room, sizeof(room), "%.1f", p->temp2 / 2.0);
+    if (p->hot_water2 != SC_PROTO_TEMP_NONE) snprintf(hot, sizeof(hot), "%.1f", p->hot_water2 / 2.0);
+    printf("ours       : mode %02X, set %.1f, room %s, demand %s, notify %d, hour %d\n",
+           p->mode, p->set2 / 2.0, room, p->demand ? "on" : "off", p->n_notify, p->hour);
+    printf("boiler     : %s, hot water %s\n", p->boiler ? "on" : "off", hot);
+    for (int a = 1; a <= SC_PROTO_ADDR_MAX; a++) {
+        const sc_proto_room_t *r = &p->room[a];
+        if (!r->seen) continue;
+        printf("addr %d     : room %5.1f, set %5.1f, mode %02X, demand %s\n", a,
+               r->temp2 == SC_PROTO_TEMP_NONE ? 0 : r->temp2 / 2.0, r->set2 == SC_PROTO_TEMP_NONE ? 0 : r->set2 / 2.0,
+               r->mode < 0 ? 0 : r->mode, r->demand ? "on" : "off");
+    }
     return 0;
 }
 
@@ -553,7 +760,7 @@ static void _plcloop_cmd_init(void)
 #endif
 
     ESP_ERROR_CHECK(esp_console_cmd_register(&(esp_console_cmd_t){
-        .command = "plc", .help = "PLC bus status",
+        .command = "plc", .help = "PLC bus status and controller role",
         .func = &_plc_cmd,
     }));
 
@@ -621,6 +828,10 @@ esp_err_t sc_plcloop_init(void)
     sc_eventloop_add_event(_plcloop->loop, PLCLOOP_RX_ERROR_EVENT_ID, _rx_error_event_handler, NULL);
     sc_eventloop_add_event(_plcloop->loop, PLCLOOP_TX_DONE_EVENT_ID, _tx_done_event_handler, NULL);
     sc_eventloop_add_event(_plcloop->loop, PLCLOOP_SEND_EVENT_ID, _send_event_handler, NULL);
+    sc_eventloop_add_event(_plcloop->loop, PLCLOOP_ROLE_EVENT_ID, _role_event_handler, NULL);
+
+    /* Listen only until sysloop sets the role from the installed room */
+    sc_proto_init(&_plcloop->proto, 0, SC_PROTO_MODE_HEAT, 44);
 
     ESP_GOTO_ON_ERROR(_dump_uart_init(), _err, TAG, "failed to init dump uart");
 

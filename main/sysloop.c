@@ -24,6 +24,8 @@ static const char* TAG = "sysloop";
 #define SYSLOOP_ENCODER_EVENT_ID    2
 #define SYSLOOP_SWITCH_READY_EVENT_ID 3
 #define SYSLOOP_ROOM_EVENT_ID       4
+#define SYSLOOP_HEAT_EVENT_ID       5
+#define SYSLOOP_PLC_EVENT_ID        6
 
 /* Lights: K3 = L1, K4 = L2 in every room; 큰방 has a third light on K2 (L3).
    Elsewhere K2 is the UI's ROOM key, which only the living room (master)
@@ -84,6 +86,12 @@ typedef struct _room_event_data {
     bool heat_on;
 } _room_event_data_t;
 
+typedef struct _heat_event_data {
+    int room;
+    bool on;
+    int16_t target_x10;
+} _heat_event_data_t;
+
 typedef struct _key_event_data {
     int ch;             /* 1..4 = K1..K4 */
     sc_switch_key_t event;
@@ -102,6 +110,15 @@ typedef struct _sysloop {
     int bright_force;                   /* -1 = auto, else forced level */
     int room;                           /* installed room (app_room_t), from the UI */
     bool heat_on;                       /* heating in the room on screen, from the UI */
+
+    /* Boiler bus (docs/plc-protocol.md §7): the UI's heating per room, what
+       the bus says about demand, and our role */
+    struct { bool on; int16_t target_x10; bool known; } heat[APP_ROOM_COUNT];
+    bool room_demand[APP_ROOM_COUNT];
+    bool boiler;
+    int plc_addr;                       /* role set on the bus; 0 = not yet */
+    bool room_known;                    /* the UI has told us the installed room */
+    int ring_burning;                   /* LED ring colour shown: 1 red, 0 white, -1 not set */
 } _sysloop_t;
 
 static _sysloop_t *_sysloop;
@@ -155,7 +172,134 @@ static void _switch_ready_cb(void *arg)
     sc_eventloop_post_event(_sysloop->loop, SYSLOOP_SWITCH_READY_EVENT_ID, NULL, 0);
 }
 
+/**
+ * UI heat callback - runs in the LVGL task
+ */
+static void _ui_heat_cb(int room, bool on, int16_t target_x10, void *arg)
+{
+    if (!_sysloop || !_sysloop->loop) return;
+
+    _heat_event_data_t d = { .room = room, .on = on, .target_x10 = target_x10 };
+    sc_eventloop_post_event(_sysloop->loop, SYSLOOP_HEAT_EVENT_ID, &d, sizeof(d));
+}
+
+/**
+ * PLC note callback - runs in the plcloop thread
+ */
+static void _plc_note_cb(const sc_plc_note_t *note, void *arg)
+{
+    if (!_sysloop || !_sysloop->loop) return;
+
+    sc_eventloop_post_event(_sysloop->loop, SYSLOOP_PLC_EVENT_ID, (void *)note, sizeof(*note));
+}
+
+/* ========== Boiler bus — rooms are app_room_t, a room's address is its index + 1 ========== */
+
+static uint8_t _plc_mode(bool on)
+{
+    return on ? SC_PROTO_MODE_HEAT : SC_PROTO_MODE_AWAY;   /* off = away: frost-safe at 10 °C */
+}
+
+static int _room_of_addr(int addr)
+{
+    return addr >= 1 && addr <= APP_ROOM_COUNT ? addr - 1 : -1;
+}
+
+static bool _is_living(void)
+{
+    return _sysloop->room == APP_ROOM_LIVING;
+}
+
+/* The flame: a room burns while it asks for heat and the boiler runs */
+static void _burn_apply(void)
+{
+    for (int i = 0; i < APP_ROOM_COUNT; i++) {
+        if (i != _sysloop->room && !_is_living()) continue;
+        ui_room_burn_update(i, _sysloop->room_demand[i] && _sysloop->boiler);
+    }
+
+    /* The ring shares the backlight line and cannot go dark while the screen
+       is on, so its colour tells: red while this unit's room burns, else white */
+    int burning = _sysloop->room_demand[_sysloop->room] && _sysloop->boiler;
+    if (burning != _sysloop->ring_burning) {
+        _sysloop->ring_burning = burning;
+        sc_led_color(burning ? 0 : 1);
+    }
+}
+
+/* (Re)take the installed room's address with its heating as the UI has it */
+static void _plc_role_apply(void)
+{
+    int room = _sysloop->room;
+    if (!_sysloop->room_known || !_sysloop->heat[room].known) return;
+    int addr = room + 1;
+    if (addr == _sysloop->plc_addr) return;
+    _sysloop->plc_addr = addr;
+    sc_plcloop_set_role(addr, _plc_mode(_sysloop->heat[room].on), _sysloop->heat[room].target_x10 / 5);
+}
+
 /* ========== Event handlers — run in the sysloop thread ========== */
+
+/* The user changed a room's heating on the knob, or the UI reports its start */
+static void _heat_event_handler(int id, void *arg, void *data)
+{
+    _heat_event_data_t *d = (_heat_event_data_t *)data;
+    if (d->room < 0 || d->room >= APP_ROOM_COUNT) return;
+
+    bool first = !_sysloop->heat[d->room].known;
+    _sysloop->heat[d->room].on = d->on;
+    _sysloop->heat[d->room].target_x10 = d->target_x10;
+    _sysloop->heat[d->room].known = true;
+    if (first || !_sysloop->plc_addr) {
+        _plc_role_apply();
+        return;
+    }
+
+    uint8_t mode = _plc_mode(d->on), set2 = d->target_x10 / 5;
+    if (d->room == _sysloop->room) {
+        sc_plcloop_set_heat(mode, set2);                   /* C5 to the MC200 */
+    } else if (_is_living()) {
+        sc_plcloop_request_set(d->room + 1, 0x08, mode);   /* F5 → A5 to that room */
+        sc_plcloop_request_set(d->room + 1, 0x01, set2);
+    }
+    ESP_LOGI(TAG, "heat room %d: %s %d.%d", d->room, d->on ? "on" : "off", d->target_x10 / 10, d->target_x10 % 10);
+}
+
+static void _plc_event_handler(int id, void *arg, void *data)
+{
+    sc_plc_note_t *n = (sc_plc_note_t *)data;
+
+    switch (n->kind) {
+    case SC_PLC_NOTE_OWN: {                                /* set over the bus: show it */
+        int room = _sysloop->room;
+        bool on = sc_proto_mode_is_heat(n->mode);
+        _sysloop->heat[room].on = on;
+        _sysloop->heat[room].target_x10 = n->set2 * 5;
+        ui_room_heat_update(room, on, n->set2 * 5);
+        ESP_LOGI(TAG, "bus set our room: mode %02X, %d.%d", n->mode, n->set2 / 2, n->set2 % 2 * 5);
+    }
+        /* our demand may have changed with it */
+        __attribute__((fallthrough));
+    case SC_PLC_NOTE_STATE:
+        _sysloop->boiler = n->boiler;
+        _sysloop->room_demand[_sysloop->room] = n->demand;
+        _burn_apply();
+        break;
+    case SC_PLC_NOTE_ROOM: {
+        int room = _room_of_addr(n->addr);
+        if (room < 0 || room == _sysloop->room) break;
+        _sysloop->room_demand[room] = n->demand;
+        _sysloop->boiler = n->boiler;
+        if (!_is_living()) break;                          /* only the master shows other rooms */
+        if (n->temp2 != SC_PROTO_TEMP_NONE) ui_room_climate_update(room, n->temp2 * 5, UI_HUM_NONE);
+        if (n->mode >= 0 && n->set2 != SC_PROTO_TEMP_NONE) {
+            ui_room_heat_update(room, sc_proto_mode_is_heat(n->mode), n->set2 * 5);
+        }
+        _burn_apply();
+        break;
+    }
+    }
+}
 
 static int _light_num(void)
 {
@@ -210,7 +354,10 @@ static void _room_event_handler(int id, void *arg, void *data)
     _room_event_data_t *d = (_room_event_data_t *)data;
     int room = d->room;
     _sysloop->room = room;
+    _sysloop->room_known = true;
+    _burn_apply();                      /* the ring follows the new room */
     _sysloop->heat_on = d->heat_on;
+    _plc_role_apply();
     if (sc_switch_is_ready()) {
         _key_leds_apply();
     }
@@ -327,6 +474,7 @@ static void _temp_set_present(bool present)
     if (!present && _sysloop->info.climate_valid) {
         _sysloop->info.climate_valid = false;
         ui_local_climate_update(UI_TEMP_NONE, UI_HUM_NONE);
+        sc_plcloop_set_temp(SC_PROTO_TEMP_NONE);       /* no reading, no demand */
     }
 }
 
@@ -348,6 +496,7 @@ static void _sysloop_temp_get_cb(int id, void *arg, void *data)
     _sysloop->info.humid = humid;
     _sysloop->info.climate_valid = true;
     ui_local_climate_update((int16_t)lroundf(temp * 10), (int8_t)lroundf(humid));
+    sc_plcloop_set_temp((int16_t)lroundf(temp * 2));    /* 0.5 °C steps on the bus */
 
     /* TODO: heating decision */
     ESP_LOGD(TAG, "climate %.2f C, %.2f %%RH", temp, humid);
@@ -485,6 +634,7 @@ esp_err_t sc_sysloop_init(void)
     _sysloop->bright_pending = SC_BRIGHT_NORMAL;
     _sysloop->bright_force = -1;
     _sysloop->info.screen_on = true;
+    _sysloop->ring_burning = -1;
 
     /* Handlers do I2C and ADC reads — keep headroom */
     _sysloop->loop = sc_eventloop_create("sysloop", 16, 4096);
@@ -495,13 +645,18 @@ esp_err_t sc_sysloop_init(void)
     sc_eventloop_add_event(_sysloop->loop, SYSLOOP_ENCODER_EVENT_ID, _encoder_event_handler, NULL);
     sc_eventloop_add_event(_sysloop->loop, SYSLOOP_SWITCH_READY_EVENT_ID, _switch_ready_event_handler, NULL);
     sc_eventloop_add_event(_sysloop->loop, SYSLOOP_ROOM_EVENT_ID, _room_event_handler, NULL);
+    sc_eventloop_add_event(_sysloop->loop, SYSLOOP_HEAT_EVENT_ID, _heat_event_handler, NULL);
+    sc_eventloop_add_event(_sysloop->loop, SYSLOOP_PLC_EVENT_ID, _plc_event_handler, NULL);
 
     sc_eventloop_add_timer(_sysloop->loop, SYSLOOP_ALS_TIMER_ID, _sysloop_als_cb, NULL, _ALS_PERIOD_MS, true);
     sc_eventloop_add_timer(_sysloop->loop, SYSLOOP_TEMP_START_TIMER_ID, _sysloop_temp_start_cb, NULL, _TEMP_FIRST_MS, false);
 
     sc_switchloop_register_key_callback(_switch_key_cb, NULL);
     sc_switchloop_register_ready_callback(_switch_ready_cb, NULL);
+    /* Heat before room: the role is taken with the installed room's heating */
+    ui_register_heat_callback(_ui_heat_cb, NULL);
     ui_register_room_callback(_ui_room_cb, NULL);
+    sc_plcloop_register_callback(_plc_note_cb, NULL);
     sc_encoder_register_callback(_encoder_driver_cb, NULL);
 
     _sysloop_cmd_init();
@@ -519,6 +674,8 @@ void sc_sysloop_end(void)
     sc_switchloop_register_key_callback(NULL, NULL);
     sc_switchloop_register_ready_callback(NULL, NULL);
     ui_register_room_callback(NULL, NULL);
+    ui_register_heat_callback(NULL, NULL);
+    sc_plcloop_register_callback(NULL, NULL);
     sc_encoder_register_callback(NULL, NULL);
     _sysloop_destroy();
 }

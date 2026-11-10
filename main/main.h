@@ -4,6 +4,7 @@
 #include "esp_err.h"
 #include "x3switch.h"
 #include "plc.h"
+#include "plc_proto.h"
 
 #define SC_MODEL    "X3THERMOSTAT"
 #define SC_VERSION  "0.1.0"
@@ -70,10 +71,44 @@ const sc_sysinfo_t *sc_sysloop_get_info(void);
 
 /*
  * plcloop — owner of the PLC bus link to the boiler controller. Frames are
- * gathered into groups (frames 12 ms apart, groups 254 ms apart); what the
- * groups mean is not decoded yet (docs/plc-protocol.md).
+ * gathered into groups (frames 12 ms apart, groups 254 ms apart) and into
+ * messages for the controller role (components/plcproto, docs/plc-protocol.md
+ * §7): a room controller at address 2~6, or the living-room controller at 1.
+ *
+ * Once a role is set, its answers go on the bus: no original controller may
+ * remain at that address.
  */
 esp_err_t sc_plcloop_init(void);
 void sc_plcloop_end(void);
 /* Queues one frame per byte (≤ SC_PLC_SEND_MAX); the plcloop thread sends them */
 esp_err_t sc_plcloop_send(const uint8_t *data, size_t len);
+
+/* Our role: address 1 (living room) or 2~6 (room), 0 = listen only, with the
+   controller's mode and setpoint (×2, 0.5 °C) to start from */
+esp_err_t sc_plcloop_set_role(uint8_t addr, uint8_t mode, uint8_t set2);
+/* Local changes (UI), reported to the MC200 with C5 */
+esp_err_t sc_plcloop_set_heat(uint8_t mode, uint8_t set2);
+/* Room temperature ×2 from our sensor; SC_PROTO_TEMP_NONE when lost */
+esp_err_t sc_plcloop_set_temp(int16_t temp2);
+/* Living room only: set another room through the MC200 (F5) */
+esp_err_t sc_plcloop_request_set(uint8_t addr, uint8_t item, uint8_t value);
+
+/* What the bus told us. Runs in the plcloop thread: post, don't act. */
+typedef enum {
+    SC_PLC_NOTE_OWN,        /* our mode / setpoint set over the bus (A5) */
+    SC_PLC_NOTE_ROOM,       /* an overheard room changed */
+    SC_PLC_NOTE_STATE,      /* boiler bit or our demand changed */
+} sc_plc_note_kind_t;
+
+typedef struct sc_plc_note {
+    sc_plc_note_kind_t kind;
+    uint8_t addr;           /* ROOM: whose */
+    bool demand;            /* ROOM: theirs; OWN / STATE: ours */
+    bool boiler;
+    int16_t temp2;          /* ROOM: ×2, SC_PROTO_TEMP_NONE unknown */
+    int16_t set2;           /* ×2, SC_PROTO_TEMP_NONE unknown */
+    int16_t mode;           /* -1 unknown */
+} sc_plc_note_t;
+
+typedef void (*sc_plcloop_callback_t)(const sc_plc_note_t *note, void *arg);
+esp_err_t sc_plcloop_register_callback(sc_plcloop_callback_t callback, void *arg);
