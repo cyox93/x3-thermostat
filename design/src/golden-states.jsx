@@ -32,7 +32,7 @@ const GOLDEN = [
 
 function Frame({ s }) {
   let body = null;
-  if (s.kind === 'main') body = <window.ScreenBoiler roomName={s.room} currentTemp={TEMPS[s.room]} humidity={s.noHum ? null : HUMS[s.room]} state={{ on: s.on, target: s.target }} burning={s.burning} summary={s.summary || null} />;
+  if (s.kind === 'main') body = <window.ScreenBoiler roomName={s.room} currentTemp={TEMPS[s.room]} humidity={s.noHum || (s.summary && s.room !== '거실') ? null : HUMS[s.room]} state={{ on: s.on, target: s.target }} burning={s.burning} summary={s.summary || null} />;
   if (s.kind === 'settings') body = <window.ScreenSettings items={window.SETTINGS_ITEMS} selected={s.sel} settings={s.settings} />;
   if (s.kind === 'room') body = <window.ScreenRoomEdit selected={s.sel} />;
   if (s.kind === 'bright') body = <window.ScreenBrightness value={s.value} />;

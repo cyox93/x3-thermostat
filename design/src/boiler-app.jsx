@@ -578,7 +578,7 @@ function App() {
   const roomName = ROOMS[roomIdx];
   let screen;
   if (mode === 'main') {
-    screen = <ScreenBoiler roomName={activeName} currentTemp={currentTemps[activeName]} humidity={tweaks.showHumidity === false ? null : humidities[activeName]} state={state} burning={burningOf(activeName)}
+    screen = <ScreenBoiler roomName={activeName} currentTemp={currentTemps[activeName]} humidity={tweaks.showHumidity === false || activeName !== ROOMS[roomIdx] ? null : humidities[activeName] /* other rooms arrive over PLC without humidity */} state={state} burning={burningOf(activeName)}
       summary={isMaster ? ROOMS.map(r => ({ name: r, on: roomStates[r].on, burning: burningOf(r) })) : null} />;
   } else if (mode === 'settings') {
     screen = <ScreenSettings items={SETTINGS_ITEMS} selected={settingsSel} settings={{ ...settings, roomName }} />;

@@ -112,7 +112,9 @@ void screen_main_refresh(void)
 
     /* No reading at all (sensor missing) shows "--" so the line never just
        vanishes; a temperature without humidity drops the humidity, as the
-       design does */
+       design does. Only the installed room has humidity: the master's other
+       rooms come over PLC, which carries none. */
+    bool own = st->active_room == st->installed_room;
     bool has_cur = r->current_x10 != APP_TEMP_NONE;
     if (has_cur) {
         char t[12];
@@ -122,8 +124,8 @@ void screen_main_refresh(void)
     } else {
         lv_label_set_text(s.cur_temp, "현재 --°");
     }
-    bool has_hum = r->humidity != APP_HUM_NONE;
-    ui_show(s.cur_hum, has_hum || !has_cur);
+    bool has_hum = own && r->humidity != APP_HUM_NONE;
+    ui_show(s.cur_hum, has_hum || (own && !has_cur));
     if (has_hum) lv_label_set_text_fmt(s.cur_hum, "%d%%", r->humidity);
     else lv_label_set_text(s.cur_hum, "--%");
 
