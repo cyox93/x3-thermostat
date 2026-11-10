@@ -24,6 +24,9 @@ const VB = 240;
 const CX = 120, CY = 120;
 
 const SCREEN_TIME_STEPS = [10, 20, 30, 60, 120, 300, 0]; // seconds; 0 = always on (last step)
+// Brightness / screen-time arcs keep a stub at the minimum so it never reads as 0
+const EDIT_ARC_MIN = 0.05;
+const editArc = (t) => EDIT_ARC_MIN + (1 - EDIT_ARC_MIN) * t;
 const screenTimeLabel = (v) => v === 0 ? '항상' : v >= 60 ? `${v / 60}분` : `${v}초`;
 const ROOMS = ['거실', '큰방', '작은방', '일하는방'];
 
@@ -284,7 +287,7 @@ function ScreenRoomEdit({ selected }) {
 // ─── SETTINGS: brightness edit ───────────────────────────────
 function ScreenBrightness({ value }) {
   const startDeg = -130, endDeg = 130;
-  const t = (value - 10) / 90;
+  const t = editArc((value - 10) / 90);
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
       <svg viewBox={`0 0 ${VB} ${VB}`} style={{ position: 'absolute', inset: 0 }}>
@@ -311,7 +314,7 @@ function ScreenScreenTime({ value }) {
   const steps = SCREEN_TIME_STEPS;
   const idx = Math.max(0, steps.indexOf(value));
   const startDeg = -130, endDeg = 130;
-  const t = idx / (steps.length - 1);
+  const t = editArc(idx / (steps.length - 1));
   const label = screenTimeLabel(value);
   return (
     <div style={{ position: 'absolute', inset: 0 }}>

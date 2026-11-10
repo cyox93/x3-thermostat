@@ -49,6 +49,12 @@ lv_obj_t *screen_edit_value_create(void)
     return s.scr;
 }
 
+/* The minimum keeps a stub of arc so it never reads as 0 (design editArc) */
+static int edit_arc(int t_pm)
+{
+    return UIG_EDIT_ARC_MIN_PM + (1000 - UIG_EDIT_ARC_MIN_PM) * t_pm / 1000;
+}
+
 static int time_index(uint16_t sec)
 {
     for (int i = 0; i < APP_SCREEN_TIME_STEPS; i++) {
@@ -71,11 +77,11 @@ void screen_edit_value_refresh(void)
         lv_label_set_text(s.title, "화면밝기");
         snprintf(buf, sizeof(buf), "%d", st->brightness);
         ui_tight_label_set_text(s.bright_num, buf);
-        gauge_set_value(s.gauge, true, (st->brightness - 10) * 1000 / 90);
+        gauge_set_value(s.gauge, true, edit_arc((st->brightness - 10) * 1000 / 90));
     } else {
         lv_label_set_text(s.title, "화면시간");
         ui_tight_label_set_text(s.time_num, app_screen_time_label(st->screen_time_s, buf, sizeof(buf)));
-        gauge_set_value(s.gauge, true, time_index(st->screen_time_s) * 1000 / (APP_SCREEN_TIME_STEPS - 1));
+        gauge_set_value(s.gauge, true, edit_arc(time_index(st->screen_time_s) * 1000 / (APP_SCREEN_TIME_STEPS - 1)));
     }
     wifi_set_level(s.wifi, st->wifi_level);
 }

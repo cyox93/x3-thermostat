@@ -90,6 +90,7 @@
 #define UIG_ROOM_HINT_LS      0       /* 0.04em × 17 = 0.68; 1 made the line 6 px too wide */
 
 /* Edit screens (ScreenBrightness / ScreenScreenTime) */
+#define UIG_EDIT_ARC_MIN_PM   50      /* arc at the minimum value, ‰ (design EDIT_ARC_MIN 0.05) */
 #define UIG_EDIT_TITLE_LS     2       /* 0.12em × 20 */
 #define UIG_EDIT_TITLE_MB     6
 #define UIG_EDIT_BRIGHT_H     72      /* line-height 1 */
