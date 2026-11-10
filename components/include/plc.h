@@ -14,8 +14,9 @@
 #include <stdbool.h>
 #include "esp_err.h"
 
-/* Max bytes (= frames) per sc_plc_send */
-#define SC_PLC_SEND_MAX     8
+/* Max bytes (= frames) per sc_plc_send: one whole message, whose header
+ * length nibble allows 15 (the CA full state is 10) */
+#define SC_PLC_SEND_MAX     16
 
 /* Set in the RX value for our own carrier seen back through the module: a
  * burst that closes during a send or just after it (it closes only after the
