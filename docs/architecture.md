@@ -80,7 +80,7 @@ main/
   mainloop.c            ✅ get_ver, 각 loop 초기화
   switchloop.c          ✅ x3-switch 보드의 소유자 — 릴레이 · 버튼 LED 상태 동기화, 키 CLICK/LONG 판정
   sysloop.c             🔶 정책의 소유자 — 키 · 엔코더 · AHT25 · 조도 (정책은 TODO)
-  plcloop.c             🔶 PLC 프레임 → 그룹 · 메시지(체크섬), 송신 요청, 벤치 빌드 전용 MC200 대역(송신 검증) (조절기 역할은 TODO)
+  plcloop.c             🔶 PLC 프레임 → 그룹 · 메시지 → 조절기 역할(plcproto), 폴링 자리 응답, 벤치 빌드 전용 MC200 대역
   netloop.c             ⬜ WiFi · MQTT
 components/
   include/board.h       main-board 핀맵 (유일한 원본, docs/hardware.md와 쌍)
@@ -88,6 +88,7 @@ components/
   device/               ✅ gc9a01(LCD) · led(Ring+BL) · encoder · als(조도) · temp_humid(온습도, AHT25) · gpio_cmd
   x3switch/             ✅ x3-switch AT 클라이언트 (UART)
   plc/                  ✅ PLC 모뎀 드라이버 — RMT RX 해독 · RMT TX 오픈드레인 송신 (프레임 = 1바이트)
+  plcproto/             🔶 조절기 역할(방 · 거실) — 순수 C, 호스트 시험 · 실제 버스 기록 대조 (plc-protocol.md §7)
   state/                🔶 UI 상태 (app_state) · 상호작용 표 (app_input) — 순수 C, 호스트 시험
   ui/                   🔶 LVGL 화면 · 위젯, ui_router(esp_lvgl_port) — 입력 큐 · 설치 방 콜백 · 화면밝기 · NVS, 화면시간 등은 TODO
 tools/
@@ -229,7 +230,7 @@ switchloop에 있다. 드라이버를 직접 부르는 명령을 두면 loop가 
 |---|---|---|
 | 전등 | 3 (L1~L3) | 2 (L1 · L2) |
 | 버튼 배정 | K3 · K4 = 전등 1 · 2, **K2 = 전등 3** | K3 · K4 = 전등 1 · 2, K2 = 없음 (거실 유닛은 K2 = 방 선택) |
-| 역할 · PLC 주소 | 방 조절기, 주소 = DT-200의 방 번호 + 1 (방별 번호는 설치 때 확인) | 〃 (거실 유닛은 거실 조절기, 주소 1) |
+| 역할 · PLC 주소 | 방 조절기, 주소 2 (큰방) | 작은방 3 · 일하는방 4 (거실 유닛은 거실 조절기, 주소 1) — 설치 방에서 정해진다 |
 | MQTT 토픽 접두사 | 방 이름 | 방 이름 |
 
 **펌웨어 바이너리는 한 개다.** 설치 방은 UI 설정 화면에서 고르고 NVS(`ui_room`)에 남는다. sysloop이

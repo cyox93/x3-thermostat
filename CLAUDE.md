@@ -51,7 +51,7 @@ on the host (`docs/ui.md` §6):
 
 ```sh
 cmake -S tools/sim -B tools/sim/build -G Ninja && cmake --build tools/sim/build
-ctest --test-dir tools/sim/build          # app_state / app_input unit tests
+ctest --test-dir tools/sim/build          # app_state / app_input / plc_proto unit tests
 tools/sim/build/sim &                     # SDL2 sim; test commands on TCP 9999
 cd design/tools && node render-sim.mjs && npm run diff && npm run replay:sim
 ```
@@ -71,8 +71,12 @@ makes them once); `replay:sim` runs `scenarios.json`. Both must pass after UI ch
 - **`components/x3switch/`** — AT client for the x3-switch board; notifications via callback.
 - **`components/plc/`** — PLC modem link on RMT: RX decodes one frame = one byte in the ISR,
   TX sends open-drain on `/SCTL`. Waveform rules and what is still unknown: `docs/plc-protocol.md`.
+- **`components/plcproto/`** — the controller roles in pure C (room at address 2~4, living room
+  at 1): message in → answer for our poll slot + change flags. Host-tested (`test_plc_proto`).
+  plcloop sends them as soon as the role is set — **the original controller at that address
+  must be off the bus**.
 - **`main/`** — the application as *loops*, same layout as the user's `scmbd` project:
-  `main.c` (init order), `main.h` (public loop APIs), `mainloop.c` (inits loops),
+  `main.c` (init order), `main.h` (public loop APIs), `mainloop.c` (inits loops; plcloop before sysloop),
   `switchloop.c` (owns relays / button LEDs / keys), `sysloop.c` (owns policy, sensors,
   button-LED brightness levels, key → light policy), `plcloop.c` (gathers PLC frames into groups, sends).
 - **`components/state/`** — UI state in pure C: `app_state.c` (the store, one observer),

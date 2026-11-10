@@ -125,6 +125,7 @@ X3 패널의 CON1-9 한 선이 **LCD 백라이트와 LED Ring enable을 함께**
 - PWM 듀티 → LCD 밝기. LED Ring은 on/off로만 반응한다 (밝기 조절 안 됨).
 - 듀티 0 → **LCD와 Ring 둘 다 꺼진다.** Ring만 끄고 화면을 켜 두는 조합은 없다.
 - Ring 색은 IO47로 고른다. Ring이 켜져 있을 때만 의미가 있다.
+  펌웨어는 색으로 난방을 보인다: 설치 방이 연소 중(그 방의 요구 && 보일러 가동)이면 빨강, 아니면 흰색 (sysloop).
 
 현재 드라이버(`device/led.c`)는 LEDC 5 kHz · 8 bit, `led_brightness 0~255`.
 UI 설계 시 "화면은 켜고 Ring만 끔"이 불가능하다는 점을 전제로 한다.

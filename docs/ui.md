@@ -154,10 +154,12 @@ void ui_register_screen_callback(ui_screen_callback_t cb, void *arg);
 ```
 
 
-**지금 실기에 있는 것 (2026-11-08):** `ui_input()`(큐 16개, 10 ms `lv_timer`가 비운다)과
-`ui_register_room_callback(room, heat_on)` — 설치 방과 화면의 방의 난방 on을 LVGL 태스크에서 알린다.
-sysloop은 이것으로 키 배정과 K1 LED를 정한다. 설치 방과 화면밝기는 NVS(`ui_room` · `ui_bright`)에 남는다.
-나머지 API(`ui_local_climate_update` 등)는 아직 없다.
+**지금 실기에 있는 것 (2026-11-10):** `ui_input()`(큐 16개, 10 ms `lv_timer`가 비운다),
+`ui_local_climate_update` · `ui_room_climate_update` · `ui_room_burn_update` · `ui_room_heat_update`,
+`ui_register_room_callback(room, heat_on)`(키 배정 · K1 LED), `ui_register_heat_callback(room, on, target)`
+(노브가 300 ms 조용해지면 방마다 한 번, 시작할 때 방마다 한 번 — 버스에서 온 변경은 되알리지 않는다).
+설치 방 · 화면밝기 · 설치 방의 켜짐/목표 온도는 NVS(`ui_room` · `ui_bright` · `ui_heat`)에 남는다.
+보일러 버스와의 연결은 `plc-protocol.md` §7.2.
 
 ### 3.4 흐름
 
