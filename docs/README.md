@@ -8,7 +8,8 @@ X3 Thermostat의 **main-board(ESP32-S3-WROOM-1-N16R8) 펌웨어** 문서. 이 �
 | [architecture.md](architecture.md) | 시스템 안에서 ESP32-S3의 역할, 책임 분할, 소프트웨어 구조 | ✅ 초안 |
 | [hardware.md](hardware.md) | main-board 핀맵, 모듈 제약, 패널 신호의 전기적 동작 | ✅ 초안 |
 | [roadmap.md](roadmap.md) | 단계별 작업 목록과 진행 상태, 미결 사항 | ✅ 초안 |
-| [plc-protocol.md](plc-protocol.md) | 보일러 버스 PLC — 파형 · 메시지 · 항목 · 동작 순서, RMT 구현, X3가 할 일 | 🔶 메시지 해독 (일부 항목 미상, 송신 미시험) |
+| [plc-protocol.md](plc-protocol.md) | 보일러 버스 PLC — 파형 · 메시지 · 항목 · 동작 순서, RMT 구현, X3가 할 일 | 🔶 메시지 해독 · 방 조절기 역할 실기 확인 (일부 항목 미상) |
+| [ui.md](ui.md) | 원형 LCD UI (LVGL) — 입력 · 밝기 · 구조 · 스레드 · 검증. 모양은 `design/` | 🔶 sim 검증 완료, 실기 연결 중 |
 
 **함께 보는 문서**
 

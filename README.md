@@ -19,7 +19,7 @@ WiFi/MQTT로 전등 연동, 그리고 X3 안의 x3-switch 보드(별도 저장�
 
 | | |
 |---|---|
-| ESP-IDF | **v6.0** (`~/project/esp/v6.0/esp-idf`) |
+| ESP-IDF | **v6.0** |
 | 타깃 | `esp32s3` — Flash 16 MB (QIO), Octal PSRAM 8 MB |
 | 파티션 | `partitions.csv` — nvs · otadata · phy · ota_0 6 MB · ota_1 6 MB · storage ~3.9 MB |
 | 콘솔 | USB-C (USB Serial/JTAG) |
@@ -45,7 +45,7 @@ UI(`components/ui` · `components/state`)는 macOS SDL2 시뮬레이터로도 �
 ```sh
 brew install sdl2 cmake ninja            # 한 번
 cmake -S tools/sim -B tools/sim/build -G Ninja && cmake --build tools/sim/build
-ctest --test-dir tools/sim/build         # app_state · app_input 단위 시험
+ctest --test-dir tools/sim/build         # app_state · app_input · plc_proto 단위 시험
 tools/sim/build/sim                      # 휠 · ←/→ = 엔코더, Space = K1 (3 s 길게), Enter = 짧게, R = ROOM
 
 cd design/tools && npm i                 # 한 번
@@ -71,7 +71,8 @@ npm run replay:sim                       # scenarios.json을 sim에 재생
 | `btn_led [<1-4> <white\|orange\|blink> [ms]]` | 버튼 LED 상태 / 설정 (switchloop) |
 | `btn_led_en <on\|off>` · `btn_led_bri <0-100>` | 버튼 LED 전체 on/off · 밝기 (switchloop) |
 | `x3switch [reset]` | x3-switch 버전 · 보드가 보고하는 전체 상태 / 소프트 리셋 |
-| `bright [auto\|night\|dim\|normal]` | 조도 단계 조회 / 강제 — 버튼 LED 밝기만 바뀐다 |
+| `bright [auto\|dark\|normal]` | 조도 단계 조회 / 강제 (센서 없는 벤치용) — 버튼 LED 밝기만 바뀐다 |
+| `bright lux <n>` · `bright led <n>` | 어둡다고 볼 기준 lux · 어두울 때 버튼 LED 밝기 % (NVS 저장) |
 | `plc` | PLC 마지막 그룹 · 수신 / 오류 / 송신 카운트, 조절기 역할 · 엿들은 방 상태 (plcloop) |
 | `plc_mon <on\|off>` | PLC 프레임마다 출력 |
 | `plc_send <hex>...` | 바이트마다 PLC 프레임 송신, 예 `plc_send 83 01 04` (plcloop). 실제 버스에 나간다 |
@@ -84,3 +85,9 @@ npm run replay:sim                       # scenarios.json을 sim에 재생
 
 > ⚠️ X3 후면 PCB의 AC-DC는 **비절연**이다. AC-DC를 끊지 않은 X3에 main-board · PC ·
 > 계측기를 연결하지 않는다. 이유와 차단 방법은 [docs/hardware.md](docs/hardware.md) §4.
+
+## 라이선스
+
+[MIT](LICENSE). `components/ui/fonts/`의 LVGL 폰트는 Pretendard · Inter Tight · JetBrains Mono에서
+생성했고 원본 폰트의 SIL Open Font License 1.1을 따른다 (`tools/fonts/fetch_fonts.sh`가 원본을 받는다).
+ESP-IDF · LVGL 등 빌드 때 받는 컴포넌트는 각자의 라이선스를 따른다.
